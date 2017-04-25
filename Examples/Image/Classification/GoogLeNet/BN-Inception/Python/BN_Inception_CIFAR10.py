@@ -13,10 +13,14 @@ import cntk
 import _cntk_py
 
 import cntk.io.transforms as xforms
-from cntk.logging import *
-from cntk.ops import *
+from cntk.debugging import start_profiler, stop_profiler
 from cntk.io import ImageDeserializer, MinibatchSource, StreamDef, StreamDefs, FULL_DATA_SWEEP
-from cntk.debugging import *
+from cntk.learners import learning_rate_schedule, momentum_schedule, momentum_sgd, UnitType
+from cntk.logging import ProgressPrinter, log_number_of_parameters
+from cntk.losses import cross_entropy_with_softmax
+from cntk.metrics import classification_error
+from cntk.ops import input
+from cntk.train import training_session, CheckpointConfig, TestConfig
 
 from BN_Inception import bn_inception_cifar_model
 
@@ -60,7 +64,8 @@ def create_image_mb_source(map_file, mean_file, is_training, total_number_of_sam
         ImageDeserializer(map_file, StreamDefs(
             features = StreamDef(field='image', transforms=transforms), # first column in map file is referred to as 'image'
             labels   = StreamDef(field='label', shape=num_classes))),   # and second as 'label'
-        randomize = is_training, 
+        randomize = is_training,
+        max_samples=total_number_of_samples,
         multithreaded_deserializer = True)
 
 # Create the network.
@@ -91,7 +96,7 @@ def create_bn_inception():
     }
 
 # Create trainer
-def create_trainer(network, epoch_size, num_epochs, minibatch_size):
+def create_trainer(network, epoch_size, num_epochs, minibatch_size, progress_writers):
     
     # CNTK weights new gradient by (1-momentum) for unit gain, 
     # thus we divide Caffe's learning rate by (1-momentum)
@@ -107,19 +112,19 @@ def create_trainer(network, epoch_size, num_epochs, minibatch_size):
         lr_per_mb.extend([learning_rate] * learn_rate_adjust_interval)
         learning_rate *= learn_rate_decrease_factor
 
-    lr_schedule       = cntk.learning_rate_schedule(lr_per_mb, unit=cntk.learner.UnitType.minibatch, epoch_size=epoch_size)
-    mm_schedule       = cntk.learner.momentum_schedule(0.9)
+    lr_schedule       = learning_rate_schedule(lr_per_mb, unit=UnitType.minibatch, epoch_size=epoch_size)
+    mm_schedule       = momentum_schedule(0.9)
     l2_reg_weight     = 0.0001 # CNTK L2 regularization is per sample, thus same as Caffe
     
     # Create learner
-    learner = cntk.learner.momentum_sgd(network['output'].parameters, lr_schedule, mm_schedule, 
-                                            l2_regularization_weight=l2_reg_weight)
+    learner = momentum_sgd(network['output'].parameters, lr_schedule, mm_schedule,
+                           l2_regularization_weight=l2_reg_weight)
 
     # Create trainer
-    return cntk.Trainer(network['output'], (network['ce'], network['pe']), learner)
+    return cntk.Trainer(network['output'], (network['ce'], network['pe']), learner, progress_writers)
 
 # Train and test
-def train_and_test(network, trainer, train_source, test_source, progress_printer, max_epochs, minibatch_size, epoch_size, restore, profiler_dir):
+def train_and_test(network, trainer, train_source, test_source, max_epochs, minibatch_size, epoch_size, restore, profiler_dir):
 
     # define mapping from intput streams to network inputs
     input_map = {
@@ -131,65 +136,38 @@ def train_and_test(network, trainer, train_source, test_source, progress_printer
     if profiler_dir:
         start_profiler(profiler_dir, True)
 
-    for epoch in range(max_epochs):       # loop over epochs
-        sample_count = 0
-        while sample_count < epoch_size:  # loop over minibatches in the epoch
-            data = train_source.next_minibatch(min(minibatch_size, epoch_size-sample_count), input_map=input_map) # fetch minibatch.
-            trainer.train_minibatch(data)                                   # update model with it
-            sample_count += trainer.previous_minibatch_sample_count         # count samples processed so far
-            progress_printer.update_with_trainer(trainer, with_metric=True) # log progress
-        progress_printer.epoch_summary(with_metric=True)
-        network['output'].save(os.path.join(model_path, "BN-Inception_CIFAR-10_{}.model".format(epoch)))
-        enable_profiler() # begin to collect profiler data after first epoch
+    training_session(
+        trainer=trainer, mb_source=train_source,
+        model_inputs_to_streams=input_map,
+        mb_size=minibatch_size,
+        progress_frequency=epoch_size,
+        checkpoint_config=CheckpointConfig(frequency=epoch_size,
+                                           filename = os.path.join(
+                                           model_path, "BN-Inception_CIFAR10"),
+                                           restore=restore),
+        test_config=TestConfig(source=test_source, mb_size=minibatch_size)
+    ).train()
 
     if profiler_dir:
         stop_profiler()
-
-    # Finished
-    # Evaluation parameters
-    test_epoch_size = 10000
-    test_minibatch_size = 128
-
-    # process minibatches and evaluate the model
-    metric_numer    = 0
-    metric_denom    = 0
-    sample_count    = 0
-    minibatch_index = 0
-    
-    while sample_count < test_epoch_size:
-        current_minibatch = min(test_minibatch_size, test_epoch_size - sample_count)
-        # Fetch next test min batch.
-        data = test_source.next_minibatch(current_minibatch, input_map=input_map)
-        # minibatch data to be trained with
-        metric_numer += trainer.test_minibatch(data) * current_minibatch
-        metric_denom += current_minibatch
-        # Keep track of the number of samples processed so far.
-        sample_count += data[network['label']].num_samples
-        minibatch_index += 1
-
-    print("")
-    print("Final Results: Minibatch[1-{}]: errs = {:0.2f}% * {}".format(minibatch_index+1, (metric_numer*100.0)/metric_denom, metric_denom))
-    print("")
-
-    return metric_numer/metric_denom
 
 # Train and evaluate the network.
 def bn_inception_train_and_eval(train_data, test_data, mean_data, minibatch_size=128, epoch_size=50000, max_epochs=200, 
                          restore=True, log_to_file=None, num_mbs_per_log=100, gen_heartbeat=False, profiler_dir=None):
     _cntk_py.set_computation_network_trace_level(0)
 
-    progress_printer = ProgressPrinter(
+    progress_writers = [ProgressPrinter(
         freq=num_mbs_per_log,
         tag='Training',
         log_to_file=log_to_file,
         gen_heartbeat=gen_heartbeat,
-        num_epochs=max_epochs)
+        num_epochs=max_epochs)]
 
     network = create_bn_inception()
-    trainer = create_trainer(network, epoch_size, max_epochs, minibatch_size)
+    trainer = create_trainer(network, epoch_size, max_epochs, minibatch_size, progress_writers)
     train_source = create_image_mb_source(train_data, mean_data, True, total_number_of_samples=max_epochs * epoch_size)
     test_source = create_image_mb_source(test_data, mean_data, False, total_number_of_samples=FULL_DATA_SWEEP)
-    train_and_test(network, trainer, train_source, test_source, progress_printer, max_epochs, minibatch_size, epoch_size, restore, profiler_dir)
+    train_and_test(network, trainer, train_source, test_source, max_epochs, minibatch_size, epoch_size, restore, profiler_dir)
  
  
 if __name__=='__main__':
