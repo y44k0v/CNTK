@@ -24,6 +24,7 @@ sys.path.append(os.path.join(abs_path, "lib", "rpn"))
 sys.path.append(os.path.join(abs_path, "lib", "nms"))
 sys.path.append(os.path.join(abs_path, "lib", "nms", "gpu"))
 
+import cntk
 from cntk import Trainer, UnitType, load_model, user_function, Axis, input, parameter, times, combine, relu, \
     softmax, roipooling, reduce_sum, slice, splice, reshape, plus, CloneMethod, minus, element_times, alias
 from cntk.io import MinibatchSource, ImageDeserializer, CTFDeserializer, StreamDefs, StreamDef, TraceLevel
@@ -160,7 +161,13 @@ def create_test_mb_source(img_height, img_width, img_channels):
 
 def clone_model(base_model, from_node_names, to_node_names, clone_method):
     from_nodes = [find_by_name(base_model, node_name) for node_name in from_node_names]
+    if None in from_nodes:
+        print("Error: could not find all specified 'from_nodes' in clone. Looking for {}, found {}"
+              .format(from_node_names, from_nodes))
     to_nodes = [find_by_name(base_model, node_name) for node_name in to_node_names]
+    if None in to_nodes:
+        print("Error: could not find all specified 'to_nodes' in clone. Looking for {}, found {}"
+              .format(to_node_names, to_nodes))
     input_placeholders = dict(zip(from_nodes, [placeholder() for x in from_nodes]))
     cloned_net = combine(to_nodes).clone(clone_method, input_placeholders)
     return cloned_net
@@ -282,7 +289,7 @@ def faster_rcnn_predictor(features, gt_boxes):
 
 def create_eval_model(model, image_input):
     # modify Faster RCNN model by excluding target layers and losses
-    feature_node = find_by_name(model, "img_input")
+    feature_node = find_by_name(model, feature_node_name)
     conv_node = find_by_name(model, last_conv_node_name)
     rpn_roi_node = find_by_name(model, "rpn_rois")
     rpn_target_roi_node = find_by_name(model, "rpn_target_rois")
@@ -307,6 +314,8 @@ def create_eval_model(model, image_input):
 
 def train_model(image_input, roi_input, loss, pred_error,
                 lr_schedule, mm_schedule, l2_reg_weight, epochs_to_train):
+    if isinstance(loss, cntk.Variable):
+        loss = combine([loss])
     # Instantiate the trainer object
     learner = momentum_sgd(loss.parameters, lr_schedule, mm_schedule, l2_regularization_weight=l2_reg_weight)
     trainer = Trainer(None, (loss, pred_error), learner)
@@ -339,7 +348,7 @@ def train_model(image_input, roi_input, loss, pred_error,
 # Trains a Faster R-CNN model end-to-end
 def train_faster_rcnn_e2e(debug_output=False):
     # Input variables denoting features and labeled ground truth rois (as 5-tuples per roi)
-    image_input = input((num_channels, image_height, image_width), dynamic_axes=[Axis.default_batch_axis()], name='img_input')
+    image_input = input((num_channels, image_height, image_width), dynamic_axes=[Axis.default_batch_axis()], name=feature_node_name)
     roi_input   = input((num_input_rois, 5), dynamic_axes=[Axis.default_batch_axis()])
 
     # Instantiate the Faster R-CNN prediction model and loss function
@@ -388,17 +397,31 @@ def train_faster_rcnn_alternating(debug_output=False):
             # lr = [0.001] * 6 + [0.0001] * 2, momentum = 0.9, weight decay = 0.0005 (cf. stage2_fast_rcnn_solver30k40k.pt)
     '''
 
-    if debug_output: print("Storing graphs and models to %s." % output_path)
-
     # Learning parameters
     l2_reg_weight = 0.0005
     mm_schedule = momentum_schedule(0.9)
-    rpn_epochs = 1 #16
-    lr_per_sample_rpn = [0.001] * 12 + [0.0001] * 4
+
+    # rpn training: lr = [0.001] * 12 + [0.0001] * 4, momentum = 0.9, weight decay = 0.0005 (cf. stage1_rpn_solver60k80k.pt)
+    rpn_epochs = 16
+    if base_model_to_use == "VGG16":
+        lr_per_sample_rpn = [0.001] * 12 + [0.0001] * 4
+    else:
+        lr_per_sample_rpn = [0.001] * 12 + [0.0001] * 4
     lr_schedule_rpn = learning_rate_schedule(lr_per_sample_rpn, unit=UnitType.sample)
-    frcn_epochs = 1 #8
-    lr_per_sample_frcn = [0.001] * 6 + [0.0001] * 2
+
+    # frcn training: lr = [0.001] * 6 + [0.0001] * 2, momentum = 0.9, weight decay = 0.0005 (cf. stage1_fast_rcnn_solver30k40k.pt)
+    frcn_epochs = 20 # 8
+    if base_model_to_use == "VGG16":
+        lr_per_sample_frcn = [0.001] * 6 + [0.0001] * 2
+    else:
+        lr_per_sample_frcn = [0.0002] * 12 + [0.00001] * 8
     lr_schedule_frcn = learning_rate_schedule(lr_per_sample_frcn, unit=UnitType.sample)
+
+    if debug_output:
+        print("Storing graphs and models to %s." % output_path)
+        print("Using base model: {}".format(base_model_to_use))
+        print("lr_per_sample_rpn: {}".format(lr_per_sample_rpn))
+        print("lr_per_sample_frcn: {}".format(lr_per_sample_frcn))
 
     # base image classification model (e.g. VGG16 or AlexNet)
     base_model = load_model(base_model_file)
@@ -406,11 +429,15 @@ def train_faster_rcnn_alternating(debug_output=False):
     # stage 1a: rpn
     if True:
         # Create initial network, only rpn, without detection network
-            # --> train only the rpn (and conv3_1 and up for VGG16)
-            # lr = [0.001] * 12 + [0.0001] * 4, momentum = 0.9, weight decay = 0.0005 (cf. stage1_rpn_solver60k80k.pt)
+            #       initial weights     train?
+            # conv: base_model          only conv3_1 and up
+            # rpn:  init new            yes
+            # frcn: -                   -
+
+        print("stage 1a - rpn")
 
         # Input variables denoting features and labeled ground truth rois (as 5-tuples per roi)
-        image_input = input((num_channels, image_height, image_width), dynamic_axes=[Axis.default_batch_axis()], name='img_input')
+        image_input = input((num_channels, image_height, image_width), dynamic_axes=[Axis.default_batch_axis()], name=feature_node_name)
         roi_input = input((num_input_rois, 5), dynamic_axes=[Axis.default_batch_axis()], name='roi_input')
 
         # conv layers
@@ -435,11 +462,15 @@ def train_faster_rcnn_alternating(debug_output=False):
     # stage 1b: fast rcnn
     if True:
         # Create full network, initialize conv layers with imagenet, fix rpn weights
-            # --> train only detection network (and conv3_1 and up for VGG16)
-            # lr = [0.001] * 6 + [0.0001] * 2, momentum = 0.9, weight decay = 0.0005 (cf. stage1_fast_rcnn_solver30k40k.pt)
+            #       initial weights     train?
+            # conv: base_model          only conv3_1 and up
+            # rpn:  stage1a model       no
+            # frcn: base_model          yes
+
+        print("stage 1b - frcn")
 
         # Input variables denoting features and labeled ground truth rois (as 5-tuples per roi)
-        image_input = input((num_channels, image_height, image_width), dynamic_axes=[Axis.default_batch_axis()], name='img_input')
+        image_input = input((num_channels, image_height, image_width), dynamic_axes=[Axis.default_batch_axis()], name=feature_node_name)
         roi_input = input((num_input_rois, 5), dynamic_axes=[Axis.default_batch_axis()], name='roi_input')
 
         # conv_layers
@@ -464,14 +495,13 @@ def train_faster_rcnn_alternating(debug_output=False):
         bbox_inside_weights = alias(ptl.outputs[3], name='bbox_inside_w')
 
         # Fast RCNN
-        # TODO: train fc layers?
         fc_layers = clone_model(base_model, [pool_node_name], [last_hidden_node_name], CloneMethod.clone)
         cls_score, bbox_pred = create_fast_rcnn_predictor(conv_out, rois, fc_layers)
 
         # loss functions
         loss_cls = cross_entropy_with_softmax(cls_score, labels, axis=1)
         loss_box = user_function(SmoothL1Loss(bbox_pred, bbox_targets, bbox_inside_weights))
-        detection_losses = reduce_sum(loss_cls) + reduce_sum(loss_box)
+        detection_losses = plus(reduce_sum(loss_cls), reduce_sum(loss_box), name="detection_losses")
 
         stage1_frcn_network = combine([rois, cls_score, bbox_pred, rpn_losses, detection_losses])
         if debug_output: plot(stage1_frcn_network, os.path.join(output_path, "graph_frcn_train_stage1b_frcn." + graph_type))
@@ -483,10 +513,15 @@ def train_faster_rcnn_alternating(debug_output=False):
     if True:
         # Keep conv weights from detection network and fix them
             # --> train only rpn
-            # lr = [0.001] * 12 + [0.0001] * 4, momentum = 0.9, weight decay = 0.0005 (cf. stage2_rpn_solver60k80k.pt)
+            #       initial weights     train?
+            # conv: base_model          only conv3_1 and up
+            # rpn:  stage1a model       no
+            # frcn: base_model          yes
+
+        print("stage 2a - rpn")
 
         # Input variables denoting features and labeled ground truth rois (as 5-tuples per roi)
-        image_input = input((num_channels, image_height, image_width), dynamic_axes=[Axis.default_batch_axis()], name='img_input')
+        image_input = input((num_channels, image_height, image_width), dynamic_axes=[Axis.default_batch_axis()], name=feature_node_name)
         roi_input = input((num_input_rois, 5), dynamic_axes=[Axis.default_batch_axis()], name='roi_input')
 
         # conv_layers
@@ -497,7 +532,7 @@ def train_faster_rcnn_alternating(debug_output=False):
         rpn = clone_model(stage1_rpn_network, [last_conv_node_name, "roi_input"], ["rpn_rois", "rpn_losses"], CloneMethod.clone)
         rpn_net = rpn(conv_out, roi_input)
         rpn_rois = rpn_net.outputs[0]
-        rpn_losses = rpn_net.outputs[1] # required for training rpn in stage 2
+        rpn_losses = rpn_net.outputs[1]
 
         stage2_rpn_network = combine([rpn_rois, rpn_losses])
         if debug_output: plot(stage2_rpn_network, os.path.join(output_path, "graph_frcn_train_stage2a_rpn." + graph_type))
@@ -508,12 +543,13 @@ def train_faster_rcnn_alternating(debug_output=False):
 
     # stage 2b: fast rcnn
     if True:
-        # Keep conv and rpn weights from stpe 3 and fix them
+        # Keep conv and rpn weights from step 3 and fix them
             # --> train only detection netwrok
-            # lr = [0.001] * 6 + [0.0001] * 2, momentum = 0.9, weight decay = 0.0005 (cf. stage2_fast_rcnn_solver30k40k.pt)
+
+        print("stage 2b - frcn")
 
         # Input variables denoting features and labeled ground truth rois (as 5-tuples per roi)
-        image_input = input((num_channels, image_height, image_width), dynamic_axes=[Axis.default_batch_axis()], name='img_input')
+        image_input = input((num_channels, image_height, image_width), dynamic_axes=[Axis.default_batch_axis()], name=feature_node_name)
         roi_input = input((num_input_rois, 5), dynamic_axes=[Axis.default_batch_axis()], name='roi_input')
 
         # conv_layers
@@ -521,30 +557,17 @@ def train_faster_rcnn_alternating(debug_output=False):
         conv_out = conv_layers(image_input)
 
         # RPN
-        rpn = clone_model(stage2_rpn_network, [last_conv_node_name, "roi_input"], ["rpn_rois", "rpn_losses"], CloneMethod.freeze)
-        rpn_net = rpn(conv_out, roi_input)
-        rpn_rois = rpn_net.outputs[0]
-        rpn_losses = rpn_net.outputs[1] # required for training rpn in stage 2
-
-        ptl = user_function(ProposalTargetLayer(rpn_rois, roi_input, num_classes=num_classes))
-        rois = alias(ptl.outputs[0], name='rpn_target_rois')
-        labels = alias(ptl.outputs[1], name='label_targets')
-        bbox_targets = alias(ptl.outputs[2], name='bbox_targets')
-        bbox_inside_weights = alias(ptl.outputs[3], name='bbox_inside_w')
+        rpn = clone_model(stage2_rpn_network, [last_conv_node_name], ["rpn_rois"], CloneMethod.freeze)
+        rpn_rois = rpn(conv_out)
+        #rpn_rois = rpn_net.outputs[0]
 
         # Fast RCNN
         # TODO: train fc layers?
-        frcn = clone_model(stage1_frcn_network, [last_conv_node_name, "rpn_rois"], ["cls_score", "bbox_pred"], CloneMethod.clone)
-        frcn_net = frcn(conv_out, rois)
-        cls_score = frcn_net.outputs[0]
-        bbox_pred = frcn_net.outputs[1]
+        frcn = clone_model(stage1_frcn_network, [last_conv_node_name, "rpn_rois", "roi_input"],
+                           ["cls_score", "bbox_regr", "rpn_target_rois", "detection_losses"], CloneMethod.clone)
+        stage2_frcn_network = frcn(conv_out, rpn_rois, roi_input)
+        detection_losses = stage2_frcn_network.outputs[3]
 
-        # loss functions
-        loss_cls = cross_entropy_with_softmax(cls_score, labels, axis=1)
-        loss_box = user_function(SmoothL1Loss(bbox_pred, bbox_targets, bbox_inside_weights))
-        detection_losses = reduce_sum(loss_cls) + reduce_sum(loss_box)
-
-        stage2_frcn_network = combine([rois, cls_score, bbox_pred, rpn_losses, detection_losses])
         if debug_output: plot(stage2_frcn_network, os.path.join(output_path, "graph_frcn_train_stage2b_frcn." + graph_type))
 
         train_model(image_input, roi_input, detection_losses, detection_losses,
@@ -567,23 +590,23 @@ def regress_rois(roi_proposals, roi_regression_factors, labels):
     return roi_proposals
 
 # Tests a Faster R-CNN model
-def eval_faster_rcnn(model, debug_output=False):
+def eval_faster_rcnn(eval_model, debug_output=False):
     # get image paths
     with open(test_map_file) as f:
         content = f.readlines()
     img_base_path = os.path.dirname(os.path.abspath(test_map_file))
     img_file_names = [os.path.join(img_base_path, x.split('\t')[1]) for x in content]
 
-    image_input = input((num_channels, image_height, image_width), dynamic_axes=[Axis.default_batch_axis()], name='img_input')
-    frcn_eval = create_eval_model(model, image_input)
-
     if debug_output:
-        plot(frcn_eval, os.path.join(output_path, "graph_frcn_eval." + graph_type))
+        plot(eval_model, os.path.join(output_path, "graph_frcn_eval_{}_{}.{}"
+                                      .format(base_model_to_use, "e2e" if train_e2e else "4stage", graph_type)))
 
+    image_input = input((num_channels, image_height, image_width), dynamic_axes=[Axis.default_batch_axis()], name=feature_node_name)
     test_minibatch_source = create_test_mb_source(image_height, image_width, num_channels)
     input_map = {
         image_input: test_minibatch_source[features_stream_name],
     }
+    frcn_eval = eval_model(image_input)
 
     # evaluate test images and write netwrok output to file
     print("Evaluating Faster R-CNN model for %s images." % num_test_images)
@@ -646,20 +669,24 @@ if __name__ == '__main__':
     #plot(dummy, r"C:\Temp\Yuxiao_20170426_converted_models\VGG16_Faster-RCNN_VOC.pdf")
     #import pdb; pdb.set_trace()
 
-    model_path = os.path.join(abs_path, "Output", "faster_rcnn_py_{}_{}.model"
+    model_path = os.path.join(abs_path, "Output", "faster_rcnn_eval_{}_{}.model"
                               .format(base_model_to_use, "e2e" if train_e2e else "4stage"))
 
     # Train only if no model exists yet
     if os.path.exists(model_path) and make_mode:
         print("Loading existing model from %s" % model_path)
-        trained_model = load_model(model_path)
+        eval_model = load_model(model_path)
     else:
         if train_e2e:
             trained_model = train_faster_rcnn_e2e(debug_output=True)
         else:
             trained_model = train_faster_rcnn_alternating(debug_output=True)
-        trained_model.save(model_path)
-        print("Stored trained model at %s" % model_path)
+
+        # create and store eval model
+        image_input = input((num_channels, image_height, image_width), dynamic_axes=[Axis.default_batch_axis()], name=feature_node_name)
+        eval_model = create_eval_model(trained_model, image_input)
+        eval_model.save(model_path)
+        print("Stored eval model at %s" % model_path)
 
     # Evaluate the test set
-    eval_faster_rcnn(trained_model, debug_output=True)
+    eval_faster_rcnn(eval_model, debug_output=True)
