@@ -8,10 +8,10 @@
 from cntk import output_variable
 from cntk.ops.functions import UserFunction
 import numpy as np
-from fast_rcnn.config import cfg
-from generate_anchors import generate_anchors
-from fast_rcnn.bbox_transform import bbox_transform_inv, clip_boxes
-from fast_rcnn.nms_wrapper import nms
+from lib.fast_rcnn.config import cfg
+from lib.rpn.generate_anchors import generate_anchors
+from lib.fast_rcnn.bbox_transform import bbox_transform_inv, clip_boxes
+from lib.fast_rcnn.nms_wrapper import nms
 
 DEBUG = cfg["CNTK"].DEBUG_LAYERS
 debug_fwd = cfg["CNTK"].DEBUG_FWD

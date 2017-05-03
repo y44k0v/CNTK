@@ -75,7 +75,6 @@ def create_mb_source(map_file, image_width, image_height, num_channels, num_clas
 # Creates the network model for transfer learning
 def create_model(base_model_file, feature_node_name, last_hidden_node_name, num_classes, input_features, freeze=False):
     # Load the pretrained classification net and find nodes
-    import pdb; pdb.set_trace()
     base_model   = load_model(base_model_file)
     feature_node = find_by_name(base_model, feature_node_name)
     last_node    = find_by_name(base_model, last_hidden_node_name)

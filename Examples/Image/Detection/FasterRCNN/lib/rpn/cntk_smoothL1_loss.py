@@ -5,7 +5,7 @@
 from cntk import output_variable
 from cntk.ops.functions import UserFunction
 import numpy as np
-from fast_rcnn.config import cfg
+from lib.fast_rcnn.config import cfg
 
 DEBUG = cfg["CNTK"].DEBUG_LAYERS
 debug_fwd = cfg["CNTK"].DEBUG_FWD
@@ -33,15 +33,12 @@ class SmoothL1Loss(UserFunction):
         # smooth_L1(x) = | 0.5 * x^2     , if |x| < 1 ## corresponds to \simga/2 * x^2 in huber loss
         #                | |x| - 0.5     , otherwise
 
-        predictions = arguments[0]#[0,:]
-        targets = arguments[1]#[0,0,:]
-        bbox_inside_weights = arguments[2]#[0, 0, :]
-        sigma = self._sigma ## sigma is one for Faster R-CNN and ignored here for now
+        predictions = arguments[0]
+        targets = arguments[1]
+        bbox_inside_weights = arguments[2]
 
         diff = predictions - targets
         diff = diff * bbox_inside_weights
-
-        #import pdb; pdb.set_trace()
 
         x = np.abs(diff)
         lt1 = np.where(x < 1)

@@ -11,10 +11,10 @@ from cntk.ops.functions import UserFunction
 import yaml
 import numpy as np
 import numpy.random as npr
-from generate_anchors import generate_anchors
-from fast_rcnn.config import cfg
-from fast_rcnn.bbox_transform import bbox_transform
-from utils.cython_bbox import bbox_overlaps
+from lib.rpn.generate_anchors import generate_anchors
+from lib.fast_rcnn.config import cfg
+from lib.fast_rcnn.bbox_transform import bbox_transform
+from lib.utils.cython_bbox import bbox_overlaps
 
 DEBUG = cfg["CNTK"].DEBUG_LAYERS
 debug_fwd = cfg["CNTK"].DEBUG_FWD
