@@ -5,45 +5,52 @@
 # Written by Ross Girshick and Sean Bell
 # --------------------------------------------------------
 
-import caffe
+#import caffe
 import yaml
 import numpy as np
 import numpy.random as npr
-from fast_rcnn.config import cfg
-from fast_rcnn.bbox_transform import bbox_transform
-from utils.cython_bbox import bbox_overlaps
+from utils.fast_rcnn.default_config import cfg
+from utils.fast_rcnn.bbox_transform import bbox_transform
+from utils.bbox.cython_bbox import bbox_overlaps
 
 DEBUG = False
 
-class ProposalTargetLayer(caffe.Layer):
+class ProposalTargetLayer(): #caffe.Layer):
     """
     Assign object detection proposals to ground-truth targets. Produces proposal
     classification labels and bounding-box regression targets.
     """
 
+    def set_param_str(self, param_str):
+        self.param_str_ = param_str
+
+    def set_deterministic_mode(self, mode = True):
+        self._determininistic_mode = mode
+
     def setup(self, bottom, top):
         layer_params = yaml.load(self.param_str_)
         self._num_classes = layer_params['num_classes']
+        self._determininistic_mode = False
 
         # sampled rois (0, x1, y1, x2, y2)
-        top[0].reshape(1, 5)
+        #top[0].reshape(1, 5)
         # labels
-        top[1].reshape(1, 1)
+        #top[1].reshape(1, 1)
         # bbox_targets
-        top[2].reshape(1, self._num_classes * 4)
+        #top[2].reshape(1, self._num_classes * 4)
         # bbox_inside_weights
-        top[3].reshape(1, self._num_classes * 4)
+        #top[3].reshape(1, self._num_classes * 4)
         # bbox_outside_weights
-        top[4].reshape(1, self._num_classes * 4)
+        #top[4].reshape(1, self._num_classes * 4)
 
     def forward(self, bottom, top):
         # Proposal ROIs (0, x1, y1, x2, y2) coming from RPN
         # (i.e., rpn.proposal_layer.ProposalLayer), or any other source
-        all_rois = bottom[0].data
+        all_rois = bottom[0] #.data
         # GT boxes (x1, y1, x2, y2, label)
         # TODO(rbg): it's annoying that sometimes I have extra info before
         # and other times after box coordinates -- normalize to one format
-        gt_boxes = bottom[1].data
+        gt_boxes = bottom[1] #.data
 
         # Include ground-truth boxes in the set of candidate rois
         zeros = np.zeros((gt_boxes.shape[0], 1), dtype=gt_boxes.dtype)
@@ -55,45 +62,49 @@ class ProposalTargetLayer(caffe.Layer):
         assert np.all(all_rois[:, 0] == 0), \
                 'Only single item batches are supported'
 
-        num_images = 1
-        rois_per_image = cfg.TRAIN.BATCH_SIZE / num_images
-        fg_rois_per_image = np.round(cfg.TRAIN.FG_FRACTION * rois_per_image)
+        #num_images = 1
+        #rois_per_image = int(cfg.TRAIN.BATCH_SIZE / num_images)
+        rois_per_image = cfg.TRAIN.RPN_POST_NMS_TOP_N
+        fg_rois_per_image = np.round(cfg.TRAIN.FG_FRACTION * rois_per_image).astype(int)
 
         # Sample rois with classification labels and bounding box regression
         # targets
         labels, rois, bbox_targets, bbox_inside_weights = _sample_rois(
             all_rois, gt_boxes, fg_rois_per_image,
-            rois_per_image, self._num_classes)
+            rois_per_image, self._num_classes,
+            deterministic=self._determininistic_mode)
 
         if DEBUG:
-            print 'num fg: {}'.format((labels > 0).sum())
-            print 'num bg: {}'.format((labels == 0).sum())
+            print('num fg: {}'.format((labels > 0).sum()))
+            print('num bg: {}'.format((labels == 0).sum()))
             self._count += 1
             self._fg_num += (labels > 0).sum()
             self._bg_num += (labels == 0).sum()
-            print 'num fg avg: {}'.format(self._fg_num / self._count)
-            print 'num bg avg: {}'.format(self._bg_num / self._count)
-            print 'ratio: {:.3f}'.format(float(self._fg_num) / float(self._bg_num))
+            print('num fg avg: {}'.format(self._fg_num / self._count))
+            print('num bg avg: {}'.format(self._bg_num / self._count))
+            print('ratio: {:.3f}'.format(float(self._fg_num) / float(self._bg_num)))
+
+        return rois, labels, bbox_targets, bbox_inside_weights
 
         # sampled rois
-        top[0].reshape(*rois.shape)
-        top[0].data[...] = rois
+        #top[0].reshape(*rois.shape)
+        #top[0].data[...] = rois
 
         # classification labels
-        top[1].reshape(*labels.shape)
-        top[1].data[...] = labels
+        #top[1].reshape(*labels.shape)
+        #top[1].data[...] = labels
 
         # bbox_targets
-        top[2].reshape(*bbox_targets.shape)
-        top[2].data[...] = bbox_targets
+        #top[2].reshape(*bbox_targets.shape)
+        #top[2].data[...] = bbox_targets
 
         # bbox_inside_weights
-        top[3].reshape(*bbox_inside_weights.shape)
-        top[3].data[...] = bbox_inside_weights
+        #top[3].reshape(*bbox_inside_weights.shape)
+        #top[3].data[...] = bbox_inside_weights
 
         # bbox_outside_weights
-        top[4].reshape(*bbox_inside_weights.shape)
-        top[4].data[...] = np.array(bbox_inside_weights > 0).astype(np.float32)
+        #top[4].reshape(*bbox_inside_weights.shape)
+        #top[4].data[...] = np.array(bbox_inside_weights > 0).astype(np.float32)
 
     def backward(self, top, propagate_down, bottom):
         """This layer does not propagate gradients."""
@@ -116,7 +127,7 @@ def _get_bbox_regression_labels(bbox_target_data, num_classes):
         bbox_inside_weights (ndarray): N x 4K blob of loss weights
     """
 
-    clss = bbox_target_data[:, 0]
+    clss = bbox_target_data[:, 0].astype(int)
     bbox_targets = np.zeros((clss.size, 4 * num_classes), dtype=np.float32)
     bbox_inside_weights = np.zeros(bbox_targets.shape, dtype=np.float32)
     inds = np.where(clss > 0)[0]
@@ -144,7 +155,7 @@ def _compute_targets(ex_rois, gt_rois, labels):
     return np.hstack(
             (labels[:, np.newaxis], targets)).astype(np.float32, copy=False)
 
-def _sample_rois(all_rois, gt_boxes, fg_rois_per_image, rois_per_image, num_classes):
+def _sample_rois(all_rois, gt_boxes, fg_rois_per_image, rois_per_image, num_classes, deterministic=False):
     """Generate a random sample of RoIs comprising foreground and background
     examples.
     """
@@ -161,10 +172,14 @@ def _sample_rois(all_rois, gt_boxes, fg_rois_per_image, rois_per_image, num_clas
     # Guard against the case when an image has fewer than fg_rois_per_image
     # foreground RoIs
     fg_rois_per_this_image = min(fg_rois_per_image, fg_inds.size)
+
     # Sample foreground regions without replacement
     if fg_inds.size > 0:
-        fg_inds = npr.choice(fg_inds, size=fg_rois_per_this_image, replace=False)
-
+        if deterministic:
+            fg_inds = fg_inds[:fg_rois_per_this_image]
+        else:
+            fg_inds = npr.choice(fg_inds, size=fg_rois_per_this_image, replace=False)
+            
     # Select background RoIs as those within [BG_THRESH_LO, BG_THRESH_HI)
     bg_inds = np.where((max_overlaps < cfg.TRAIN.BG_THRESH_HI) &
                        (max_overlaps >= cfg.TRAIN.BG_THRESH_LO))[0]
@@ -174,7 +189,10 @@ def _sample_rois(all_rois, gt_boxes, fg_rois_per_image, rois_per_image, num_clas
     bg_rois_per_this_image = min(bg_rois_per_this_image, bg_inds.size)
     # Sample background regions without replacement
     if bg_inds.size > 0:
-        bg_inds = npr.choice(bg_inds, size=bg_rois_per_this_image, replace=False)
+        if deterministic:
+            bg_inds = bg_inds[:bg_rois_per_this_image]
+        else:
+            bg_inds = npr.choice(bg_inds, size=bg_rois_per_this_image, replace=False)
 
     # The indices that we're selecting (both fg and bg)
     keep_inds = np.append(fg_inds, bg_inds)

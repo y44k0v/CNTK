@@ -5,26 +5,21 @@
 from cntk import output_variable
 from cntk.ops.functions import UserFunction
 import numpy as np
-from lib.fast_rcnn.config import cfg
 
-DEBUG = cfg["CNTK"].DEBUG_LAYERS
-debug_fwd = cfg["CNTK"].DEBUG_FWD
-debug_bkw = cfg["CNTK"].DEBUG_BKW
+DEBUG = False
 
 class SmoothL1Loss(UserFunction):
     """
     Computes a smooth L1 loss
     """
 
-    def __init__(self, arg1, arg2, arg3, name='SmoothL1Loss', sigma=None):
+    def __init__(self, arg1, arg2, arg3, name='SmoothL1Loss'):
         super(SmoothL1Loss, self).__init__([arg1, arg2, arg3], name=name)
-        self._sigma = sigma
 
     def infer_outputs(self):
-        return [output_variable(self.inputs[0].shape, self.inputs[0].dtype, self.inputs[0].dynamic_axes)] #, name="SmoothL1Loss")]
+        return [output_variable(self.inputs[0].shape, self.inputs[0].dtype, self.inputs[0].dynamic_axes)]
 
     def forward(self, arguments, device=None, outputs_to_retain=None):
-        if debug_fwd: print("--> Entering forward in {}".format(self.name))
         # Algorithm:
         #
         # (According to Fast R-CNN paper, formula (3))
@@ -49,7 +44,6 @@ class SmoothL1Loss(UserFunction):
         return diff, loss
 
     def backward(self, state, root_gradients, variables):
-        if debug_bkw: print("<-- Entering backward in {}".format(self.name))
         # Derivative of smooth L1 loss:
         #
         # - root_gradients      , if diff <= -1
@@ -74,15 +68,12 @@ class SmoothL1Loss(UserFunction):
             variables[self.inputs[0]] = gradients
 
     def clone(self, cloned_inputs):
-        return SmoothL1Loss(cloned_inputs[0], cloned_inputs[1], cloned_inputs[2], sigma=self._sigma)
+        return SmoothL1Loss(cloned_inputs[0], cloned_inputs[1], cloned_inputs[2])
 
     def serialize(self):
         internal_state = {}
-        if self._sigma is not None:
-            internal_state['sigma'] = self._sigma
         return internal_state
 
     @staticmethod
     def deserialize(inputs, name, state):
-        sigma = None if 'sigma' not in state else state['sigma']
-        return SmoothL1Loss(inputs[0], inputs[1], inputs[2], name=name, sigma=sigma)
+        return SmoothL1Loss(inputs[0], inputs[1], inputs[2], name=name)

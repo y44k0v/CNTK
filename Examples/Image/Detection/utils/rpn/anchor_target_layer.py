@@ -11,14 +11,11 @@ from cntk.ops.functions import UserFunction
 import yaml
 import numpy as np
 import numpy.random as npr
-from lib.rpn.generate_anchors import generate_anchors
-from lib.fast_rcnn.config import cfg
-from lib.fast_rcnn.bbox_transform import bbox_transform
-from lib.utils.cython_bbox import bbox_overlaps
+from utils.rpn.generate_anchors import generate_anchors
+from utils.fast_rcnn.bbox_transform import bbox_transform
+from utils.bbox.cython_bbox import bbox_overlaps
 
-DEBUG = cfg["CNTK"].DEBUG_LAYERS
-debug_fwd = cfg["CNTK"].DEBUG_FWD
-debug_bkw = cfg["CNTK"].DEBUG_BKW
+DEBUG = False
 
 class AnchorTargetLayer(UserFunction):
     """
@@ -26,7 +23,7 @@ class AnchorTargetLayer(UserFunction):
     labels and bounding-box regression targets.
     """
 
-    def __init__(self, arg1, arg2, name='AnchorTargetLayer', im_info=None):
+    def __init__(self, arg1, arg2, name='AnchorTargetLayer', im_info=None, cfg=None):
         super(AnchorTargetLayer, self).__init__([arg1, arg2], name=name)
         #layer_params = yaml.load(self.param_str_)
         anchor_scales = (8, 16, 32) #layer_params.get('scales', (8, 16, 32))
@@ -34,6 +31,14 @@ class AnchorTargetLayer(UserFunction):
         self._num_anchors = self._anchors.shape[0]
         self._feat_stride = 16 #layer_params['feat_stride']
         self._im_info = im_info
+        self._cfg = cfg
+
+        self._EPS = 1e-14 if cfg is None else cfg.EPS
+        self._TRAIN_RPN_CLOBBER_POSITIVES = False if cfg is None else cfg["TRAIN"].RPN_CLOBBER_POSITIVES
+        self._TRAIN_RPN_POSITIVE_OVERLAP = 0.7 if cfg is None else cfg["TRAIN"].RPN_POSITIVE_OVERLAP
+        self._TRAIN_RPN_NEGATIVE_OVERLAP = 0.3 if cfg is None else cfg["TRAIN"].RPN_NEGATIVE_OVERLAP
+        self._TRAIN_RPN_FG_FRACTION = 0.5 if cfg is None else cfg["TRAIN"].RPN_FG_FRACTION
+        self._TRAIN_RPN_BATCHSIZE = 256 if cfg is None else cfg["TRAIN"].RPN_BATCHSIZE
 
         if DEBUG:
             print ('anchors:')
@@ -43,7 +48,7 @@ class AnchorTargetLayer(UserFunction):
                 self._anchors[:, 2::4] - self._anchors[:, 0::4],
                 self._anchors[:, 3::4] - self._anchors[:, 1::4],
             )))
-            self._counts = cfg.EPS
+            self._counts = self._EPS
             self._sums = np.zeros((1, 4))
             self._squared_sums = np.zeros((1, 4))
             self._fg_sum = 0
@@ -54,21 +59,17 @@ class AnchorTargetLayer(UserFunction):
         self._allowed_border = False # layer_params.get('allowed_border', 0)
 
     def infer_outputs(self):
-        ##height, width = bottom[0].data.shape[-2:]
         height, width = self.inputs[0].shape[-2:]
         if DEBUG:
             print('AnchorTargetLayer: height', height, 'width', width)
 
         A = self._num_anchors
         # labels
-        ##top[0].reshape(1, 1, A * height, width)
         labelShape = (1, A, height, width)
         # Comment: this layer uses encoded labels, while in CNTK we mostly use one hot labels
         # bbox_targets
-        ##top[1].reshape(1, A * 4, height, width)
         bbox_target_shape = (1, A * 4, height, width)
         # bbox_inside_weights
-        #top[2].reshape(1, A * 4, height, width)
         bbox_inside_weights_shape = (1, A * 4, height, width)
 
         return [output_variable(labelShape, self.inputs[0].dtype, self.inputs[0].dynamic_axes,
@@ -79,7 +80,6 @@ class AnchorTargetLayer(UserFunction):
                                 name="rpn_bbox_inside_w", needs_gradient=False),]
 
     def forward(self, arguments, outputs, device=None, outputs_to_retain=None):
-        if debug_fwd: print("--> Entering forward in {}".format(self.name))
         # Algorithm:
         #
         # for each (H, W) location i
@@ -96,13 +96,6 @@ class AnchorTargetLayer(UserFunction):
         gt_boxes = bottom[1][0,:]
         # im_info
         im_info = self._im_info
-
-        # For CNTK: convert and scale gt_box coords from x, y, w, h relative to x1, y1, x2, y2 absolute
-        im_width = 1000
-        im_height = 1000
-        whwh = (im_width, im_height, im_width, im_height) # TODO: get image width and height OR better scale beforehand
-        ngtb = np.vstack((gt_boxes[:, 0], gt_boxes[:, 1], gt_boxes[:, 0] + gt_boxes[:, 2], gt_boxes[:, 1] + gt_boxes[:, 3]))
-        gt_boxes[:, :-1] = ngtb.transpose() * whwh
 
         # remove zero padded ground truth boxes
         keep = np.where(
@@ -169,22 +162,22 @@ class AnchorTargetLayer(UserFunction):
                                    np.arange(overlaps.shape[1])]
         gt_argmax_overlaps = np.where(overlaps == gt_max_overlaps)[0]
 
-        if not cfg.TRAIN.RPN_CLOBBER_POSITIVES:
+        if not self._TRAIN_RPN_CLOBBER_POSITIVES:
             # assign bg labels first so that positive labels can clobber them
-            labels[max_overlaps < cfg.TRAIN.RPN_NEGATIVE_OVERLAP] = 0
+            labels[max_overlaps < self._TRAIN_RPN_NEGATIVE_OVERLAP] = 0
 
         # fg label: for each gt, anchor with highest overlap
         labels[gt_argmax_overlaps] = 1
 
         # fg label: above threshold IOU
-        labels[max_overlaps >= cfg.TRAIN.RPN_POSITIVE_OVERLAP] = 1
+        labels[max_overlaps >= self._TRAIN_RPN_POSITIVE_OVERLAP] = 1
 
-        if cfg.TRAIN.RPN_CLOBBER_POSITIVES:
+        if self._TRAIN_RPN_CLOBBER_POSITIVES:
             # assign bg labels last so that negative labels can clobber positives
-            labels[max_overlaps < cfg.TRAIN.RPN_NEGATIVE_OVERLAP] = 0
+            labels[max_overlaps < self._TRAIN_RPN_NEGATIVE_OVERLAP] = 0
 
         # subsample positive labels if we have too many
-        num_fg = int(cfg.TRAIN.RPN_FG_FRACTION * cfg.TRAIN.RPN_BATCHSIZE)
+        num_fg = int(self._TRAIN_RPN_FG_FRACTION * self._TRAIN_RPN_BATCHSIZE)
         fg_inds = np.where(labels == 1)[0]
         if len(fg_inds) > num_fg:
             disable_inds = npr.choice(
@@ -192,20 +185,18 @@ class AnchorTargetLayer(UserFunction):
             labels[disable_inds] = -1
 
         # subsample negative labels if we have too many
-        num_bg = cfg.TRAIN.RPN_BATCHSIZE - np.sum(labels == 1)
+        num_bg = self._TRAIN_RPN_BATCHSIZE - np.sum(labels == 1)
         bg_inds = np.where(labels == 0)[0]
         if len(bg_inds) > num_bg:
             disable_inds = npr.choice(
                 bg_inds, size=(len(bg_inds) - num_bg), replace=False)
             labels[disable_inds] = -1
-            #print "was %s inds, disabling %s, now %s inds" % (
-                #len(bg_inds), len(disable_inds), np.sum(labels == 0))
 
         bbox_targets = np.zeros((len(inds_inside), 4), dtype=np.float32)
         bbox_targets = _compute_targets(anchors, gt_boxes[argmax_overlaps, :])
 
         bbox_inside_weights = np.zeros((len(inds_inside), 4), dtype=np.float32)
-        bbox_inside_weights[labels == 1, :] = np.array(cfg.TRAIN.RPN_BBOX_INSIDE_WEIGHTS)
+        bbox_inside_weights[labels == 1, :] = np.array((1.0, 1.0, 1.0, 1.0))
 
         if DEBUG:
             self._sums += bbox_targets[labels == 1, :].sum(axis=0)
@@ -235,16 +226,10 @@ class AnchorTargetLayer(UserFunction):
 
         # labels
         labels = labels.reshape((1, height, width, A)).transpose(0, 3, 1, 2)
-        # labels = labels.reshape((1, 1, A * height, width))
-        # top[0].reshape(*labels.shape)
-        # top[0].data[...] = labels
         outputs[self.outputs[0]] = np.ascontiguousarray(labels)
 
         # bbox_targets
-        bbox_targets = bbox_targets \
-            .reshape((1, height, width, A * 4)).transpose(0, 3, 1, 2)
-        # top[1].reshape(*bbox_targets.shape)
-        # top[1].data[...] = bbox_targets
+        bbox_targets = bbox_targets.reshape((1, height, width, A * 4)).transpose(0, 3, 1, 2)
         outputs[self.outputs[1]] = np.ascontiguousarray(bbox_targets)
 
         # bbox_inside_weights
@@ -252,25 +237,23 @@ class AnchorTargetLayer(UserFunction):
             .reshape((1, height, width, A * 4)).transpose(0, 3, 1, 2)
         assert bbox_inside_weights.shape[2] == height
         assert bbox_inside_weights.shape[3] == width
-        #top[2].reshape(*bbox_inside_weights.shape)
-        #top[2].data[...] = bbox_inside_weights
         outputs[self.outputs[2]] = np.ascontiguousarray(bbox_inside_weights)
 
         # No state needs to be passed to backward() so we just pass None
         return None
 
-
     def backward(self, state, root_gradients, variables):
-        if debug_bkw: print("<-- Entering backward in {}".format(self.name))
         """This layer does not propagate gradients."""
         pass
 
     def clone(self, cloned_inputs):
-        return AnchorTargetLayer(cloned_inputs[0], cloned_inputs[1], im_info=self._im_info)
+        return AnchorTargetLayer(cloned_inputs[0], cloned_inputs[1],
+                                 im_info=self._im_info, cfg=self._cfg)
 
     def serialize(self):
         internal_state = {}
         internal_state['im_info'] = self._im_info
+        # TODO: store cfg values in state
         return internal_state
 
     @staticmethod

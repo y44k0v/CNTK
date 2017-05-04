@@ -6,11 +6,8 @@ from cntk import output_variable
 from cntk.ops.functions import UserFunction
 import numpy as np
 import scipy as sp
-from lib.fast_rcnn.config import cfg
 
-DEBUG = cfg["CNTK"].DEBUG_LAYERS
-debug_fwd = cfg["CNTK"].DEBUG_FWD
-debug_bkw = cfg["CNTK"].DEBUG_BKW
+DEBUG = False
 
 class IgnoreLabel(UserFunction):
     """
@@ -27,8 +24,6 @@ class IgnoreLabel(UserFunction):
                 output_variable(self.inputs[1].shape, self.inputs[1].dtype, self.inputs[1].dynamic_axes, name='rpn_obj_targets', needs_gradient=False)]
 
     def forward(self, arguments, outputs, device=None, outputs_to_retain=None):
-        if debug_fwd: print("--> Entering forward in {}".format(self.name))
-
         # set entries to zero in target and prediction for the label to ignore
         predictions = arguments[0][0,:]
         targets = arguments[1][0,0,:]
@@ -51,8 +46,6 @@ class IgnoreLabel(UserFunction):
         return ignore_ind
 
     def backward(self, state, root_gradients, variables):
-        if debug_bkw: print("<-- Entering backward in {}".format(self.name))
-
         # gradients for prediction: propagate only for those that were not ignored
         if self.inputs[0] in variables:
             # since we set target = pred in forward the gradients for ignored entries should already be zero

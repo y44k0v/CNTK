@@ -6,7 +6,7 @@ from enum import Enum
 from PIL import Image
 
 use_center_of_bbox = False      # top left corner (i.e. xmin, ymin) will be used if set to False
-use_relative_coords = True      # absolute pixel coordinates will be used if set to False
+use_relative_coords = True      # Absolute pixel coordinates will be used if set to False
 
 pascal_voc2007_jpgimg_rel_path = "../VOCdevkit/VOC2007/JPEGImages/"
 pascal_voc2007_imgsets_rel_path = "../VOCdevkit/VOC2007/ImageSets/Main/"

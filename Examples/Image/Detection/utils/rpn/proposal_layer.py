@@ -8,14 +8,11 @@
 from cntk import output_variable
 from cntk.ops.functions import UserFunction
 import numpy as np
-from lib.fast_rcnn.config import cfg
-from lib.rpn.generate_anchors import generate_anchors
-from lib.fast_rcnn.bbox_transform import bbox_transform_inv, clip_boxes
-from lib.fast_rcnn.nms_wrapper import nms
+from utils.rpn.generate_anchors import generate_anchors
+from utils.fast_rcnn.bbox_transform import bbox_transform_inv, clip_boxes
+from utils.fast_rcnn.nms_wrapper import nms
 
-DEBUG = cfg["CNTK"].DEBUG_LAYERS
-debug_fwd = cfg["CNTK"].DEBUG_FWD
-debug_bkw = cfg["CNTK"].DEBUG_BKW
+DEBUG = False
 
 class ProposalLayer(UserFunction):
     """
@@ -23,7 +20,7 @@ class ProposalLayer(UserFunction):
     transformations to a set of regular boxes (called "anchors").
     """
 
-    def __init__(self, arg1, arg2, name='ProposalLayer', im_info=None):
+    def __init__(self, arg1, arg2, name='ProposalLayer', im_info=None, cfg=None):
         super(ProposalLayer, self).__init__([arg1, arg2], name=name)
         # parse the layer parameter string, which must be valid YAML
         # layer_params = yaml.load(self.param_str_)
@@ -34,6 +31,16 @@ class ProposalLayer(UserFunction):
         self._num_anchors = self._anchors.shape[0]
         self._im_info = im_info
 
+        self._TRAIN_RPN_PRE_NMS_TOP_N = 12000 if cfg is None else cfg["TRAIN"].RPN_PRE_NMS_TOP_N
+        self._TRAIN_RPN_POST_NMS_TOP_N = 2000 if cfg is None else cfg["TRAIN"].RPN_POST_NMS_TOP_N
+        self._TRAIN_RPN_NMS_THRESH = 0.7 if cfg is None else cfg["TRAIN"].RPN_NMS_THRESH
+        self._TRAIN_RPN_MIN_SIZE = 16 if cfg is None else cfg["TRAIN"].RPN_MIN_SIZE
+
+        self._TEST_RPN_PRE_NMS_TOP_N = 6000 if cfg is None else cfg["TEST"].RPN_PRE_NMS_TOP_N
+        self._TEST_RPN_POST_NMS_TOP_N = 300 if cfg is None else cfg["TEST"].RPN_POST_NMS_TOP_N
+        self._TEST_RPN_NMS_THRESH = 0.7 if cfg is None else cfg["TEST"].RPN_NMS_THRESH
+        self._TEST_RPN_MIN_SIZE = 16 if cfg is None else cfg["TEST"].RPN_MIN_SIZE
+
         if DEBUG:
             print ('feat_stride: {}'.format(self._feat_stride))
             print ('anchors:')
@@ -43,20 +50,13 @@ class ProposalLayer(UserFunction):
         # rois blob: holds R regions of interest, each is a 5-tuple
         # (n, x1, y1, x2, y2) specifying an image batch index n and a
         # rectangle (x1, y1, x2, y2)
-        # top[0].reshape(1, 5)
         # for CNTK the proposal shape is [4 x roisPerImage], and mirrored in Python
-        cfg_key = 'TRAIN' # str(self.phase) # either 'TRAIN' or 'TEST'
-        proposalShape = (cfg[cfg_key].RPN_POST_NMS_TOP_N, 4)
-
-        # scores blob: holds scores for R regions of interest
-        # if len(top) > 1:
-        #    top[1].reshape(1, 1, 1, 1)
+        # TODO: cfg_key = str(self.phase) # either 'TRAIN' or 'TEST'
+        proposalShape = (self._TRAIN_RPN_POST_NMS_TOP_N, 4)
 
         return [output_variable(proposalShape, self.inputs[0].dtype, self.inputs[0].dynamic_axes,
                                 name="pl_rois", needs_gradient=False)] # , name="rpn_rois"
 
-    # returns
-    # - pred_boxes (n, 4) as [x_low, y_low, x_high, y_high]
     def forward(self, arguments, device=None, outputs_to_retain=None):
         # Algorithm:
         #
@@ -70,17 +70,16 @@ class ProposalLayer(UserFunction):
         # apply NMS with threshold 0.7 to remaining proposals
         # take after_nms_topN proposals after NMS
         # return the top proposals (-> RoIs top, scores top)
-        if debug_fwd: print("--> Entering forward in {}".format(self.name))
 
         bottom = arguments
         assert bottom[0].data.shape[0] == 1, \
             'Only single item batches are supported'
 
-        cfg_key = 'TRAIN' # str(self.phase) # either 'TRAIN' or 'TEST'
-        pre_nms_topN  = cfg[cfg_key].RPN_PRE_NMS_TOP_N
-        post_nms_topN = cfg[cfg_key].RPN_POST_NMS_TOP_N
-        nms_thresh    = cfg[cfg_key].RPN_NMS_THRESH
-        min_size      = cfg[cfg_key].RPN_MIN_SIZE
+        # TODO: cfg_key = str(self.phase) # either 'TRAIN' or 'TEST'
+        pre_nms_topN  = self._TRAIN_RPN_PRE_NMS_TOP_N
+        post_nms_topN = self._TRAIN_RPN_POST_NMS_TOP_N
+        nms_thresh    = self._TRAIN_RPN_NMS_THRESH
+        min_size      = self._TRAIN_RPN_MIN_SIZE
 
         # the first set of _num_anchors channels are bg probs
         # the second set are the fg probs, which we want
@@ -178,13 +177,10 @@ class ProposalLayer(UserFunction):
         # for CNTK: add batch axis to output shape
         proposals.shape = (1,) + proposals.shape
 
-        # top[0].reshape(*(blob.shape))
-        # top[0].data[...] = blob
         return None, proposals
 
     def backward(self, state, root_gradients, variables):
         """This layer does not propagate gradients."""
-        if debug_bkw: print("<-- Entering backward in {}".format(self.name))
         pass
 
     def clone(self, cloned_inputs):
