@@ -358,6 +358,15 @@ def create_eval_model(model, image_input):
     cls_pred = softmax(cls_score, axis=1, name='cls_pred')
     return combine([cls_pred, rpn_rois, bbox_regr])
 
+def mem_used():
+    '''
+    Return the non-swapped physical memory the Python process is using.
+    '''
+    import os
+    import psutil
+    process = psutil.Process(os.getpid())
+    return process.memory_info().rss
+
 def train_model(image_input, roi_input, loss, pred_error,
                 lr_schedule, mm_schedule, l2_reg_weight, epochs_to_train):
     if isinstance(loss, cntk.Variable):
@@ -384,6 +393,7 @@ def train_model(image_input, roi_input, loss, pred_error,
         sample_count = 0
         while sample_count < epoch_size:  # loop over minibatches in the epoch
             data = minibatch_source.next_minibatch(min(mb_size, epoch_size-sample_count), input_map=input_map)
+            print(mem_used())
             trainer.train_minibatch(data)                                    # update model with it
             sample_count += trainer.previous_minibatch_sample_count          # count samples processed so far
             progress_printer.update_with_trainer(trainer, with_metric=True)  # log progress

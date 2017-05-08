@@ -118,6 +118,11 @@ def train(nonlinearity, num_hidden_layers, device_id,
             losses.append(loss)
             errors.append(error)
 
+        i += 1
+
+    # Make sure that we had a chance to check for mem leaks
+    assert i > TAKE_MEM_STAMP_AT_STEP
+
     return losses, errors
 
 
