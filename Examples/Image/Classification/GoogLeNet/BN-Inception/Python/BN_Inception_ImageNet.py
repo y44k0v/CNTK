@@ -19,7 +19,7 @@ from cntk.learners import learning_rate_schedule, momentum_schedule, momentum_sg
 from cntk.logging import ProgressPrinter, log_number_of_parameters
 from cntk.losses import cross_entropy_with_softmax
 from cntk.metrics import classification_error
-from cntk.ops import input
+from cntk.ops import input_variable
 from cntk.train import Trainer
 
 from BN_Inception import bn_inception_model
@@ -32,11 +32,11 @@ model_path = os.path.join(abs_path, "Models")
 log_dir = None
 
 # model dimensions
-image_height = 224
-image_width  = 224
-num_channels = 3  # RGB
-num_classes  = 1000
-model_name   = "BN-Inception.model"
+IMAGE_HEIGHT = 224
+IMAGE_WIDTH = 224
+NUM_CHANNELS = 3  # RGB
+NUM_CLASSES = 1000
+model_name = "BN-Inception.model"
 
 # Create a minibatch source.
 def create_image_mb_source(map_file, mean_file, is_training, total_number_of_samples):
@@ -56,28 +56,28 @@ def create_image_mb_source(map_file, mean_file, is_training, total_number_of_sam
         ]
 
     transforms += [
-        xforms.scale(width=image_width, height=image_height, channels=num_channels, interpolations='linear'),
+        xforms.scale(width=IMAGE_WIDTH, height=IMAGE_HEIGHT, channels=NUM_CHANNELS, interpolations='linear'),
         xforms.mean(mean_file)
     ]
 
     # deserializer
     return MinibatchSource(
         ImageDeserializer(map_file, StreamDefs(
-            features = StreamDef(field='image', transforms=transforms), # first column in map file is referred to as 'image'
-            labels   = StreamDef(field='label', shape=num_classes))),   # and second as 'label'
-        randomize = is_training,
+            features=StreamDef(field='image', transforms=transforms), # first column in map file is referred to as 'image'
+            labels=StreamDef(field='label', shape=NUM_CLASSES))),   # and second as 'label'
+        randomize=is_training,
         max_samples=total_number_of_samples,
-        multithreaded_deserializer = True)
+        multithreaded_deserializer=True)
 
 # Create the network.
 def create_bn_inception():
 
     # Input variables denoting the features and label data
-    feature_var = input_variable((num_channels, image_height, image_width))
-    label_var = input_variable((num_classes))
+    feature_var = input_variable((NUM_CHANNELS, IMAGE_HEIGHT, IMAGE_WIDTH))
+    label_var = input_variable((NUM_CLASSES))
 
     bn_time_const = 4096
-    z = bn_inception_model(feature_var, num_classes, bn_time_const)
+    z = bn_inception_model(feature_var, NUM_CLASSES, bn_time_const)
 
     # loss and metric
     ce  = cross_entropy_with_softmax(z, label_var)
@@ -228,7 +228,9 @@ if __name__=='__main__':
     if not os.path.isdir(data_path):
         raise RuntimeError("Directory %s does not exist" % data_path)
 
-    mean_data = os.path.join(data_path, '..', 'ImageNet1K_mean.xml')
+    os.chdir(data_path)
+
+    mean_data = os.path.join(data_path, 'ImageNet1K_mean.xml')
     train_data = os.path.join(data_path, 'train_map.txt')
     test_data = os.path.join(data_path, 'val_map.txt')
 

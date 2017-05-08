@@ -33,6 +33,7 @@ def test_bn_inception_cifar(device_id):
         pytest.skip('test only runs on GPU')
     try_set_default_device(cntk_device(device_id))
 
+    current_path = os.getcwd()
     base_path = prepare_CIFAR10_data()
     # change dir to locate data.zip correctly
     os.chdir(base_path)
@@ -45,8 +46,11 @@ def test_bn_inception_cifar(device_id):
     train_data = os.path.join(base_path, 'train_map.txt')
     test_data = os.path.join(base_path, 'test_map.txt')
 
-    error = bn_inception_train_and_eval(train_data, test_data, mean_data, minibatch_size=16, epoch_size=500,
-                                max_epochs=8, restore=False, testing_parameters=(500,16))
+    try:
+        error = bn_inception_train_and_eval(train_data, test_data, mean_data, minibatch_size=16, epoch_size=500,
+                                    max_epochs=8, restore=False, testing_parameters=(500,16))
+    finally:
+        os.chdir(current_path)
 
     expected_error = 0.88
     assert np.allclose(error, expected_error, atol=TOLERANCE_ABSOLUTE)

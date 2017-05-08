@@ -16,7 +16,6 @@ import cntk.io.transforms as xforms
 from cntk.debugging import start_profiler, stop_profiler
 from cntk.learners import learning_rate_schedule, momentum_schedule, momentum_sgd, UnitType
 from cntk.logging import ProgressPrinter, log_number_of_parameters
-from cntk.ops import input
 from cntk.train.distributed import data_parallel_distributed_learner, Communicator
 from cntk.io import ImageDeserializer, MinibatchSource, StreamDef, StreamDefs, FULL_DATA_SWEEP
 from cntk.train import training_session, CheckpointConfig, TestConfig, Trainer
@@ -30,11 +29,6 @@ config_path = abs_path
 model_path = os.path.join(abs_path, "Models")
 log_dir = None
 
-# model dimensions
-image_height = 224
-image_width  = 224
-num_channels = 3  # RGB
-num_classes  = 1000
 model_name   = "BN-Inception.model"
 
 # Create trainer
@@ -83,10 +77,10 @@ def train_and_test(network, trainer, train_source, test_source, minibatch_size, 
 
     training_session(
         trainer=trainer, mb_source=train_source,
-        model_inputs_to_streams = input_map, 
+        model_inputs_to_streams = input_map,
         mb_size = minibatch_size,
         progress_frequency = epoch_size,
-        checkpoint_config=CheckpointConfig(frequency=epoch_size, filename=os.path.join(model_path, model_name),                                   restore=restore),
+        checkpoint_config=CheckpointConfig(frequency=epoch_size, filename=os.path.join(model_path, model_name), restore=restore),
         test_config=TestConfig(source=test_source, mb_size=minibatch_size)
     ).train()
         
@@ -103,7 +97,7 @@ def bn_inception_train_and_eval(train_data, test_data, mean_data, num_quantizati
     # up. However, bigger minimatch size on the same number of samples means less updates, 
     # thus leads to higher training error. This is a trade-off of speed and accuracy
     if minibatch_size is None:
-    minibatch_size = 32 * (Communicator.num_workers() if scale_up else 1)
+        minibatch_size = 32 * (Communicator.num_workers() if scale_up else 1)
     else:
         mb_size = minibatch_size
 
@@ -155,7 +149,7 @@ if __name__=='__main__':
 
     os.chdir(data_path)
 
-    mean_data = os.path.join(data_path, '..', 'ImageNet1K_mean.xml')
+    mean_data = os.path.join(data_path, 'ImageNet1K_mean.xml')
     train_data = os.path.join(data_path, 'train_map.txt')
     test_data = os.path.join(data_path, 'val_map.txt')
 
@@ -170,6 +164,5 @@ if __name__=='__main__':
                                 gen_heartbeat=True,
                                 scale_up=bool(args['scale_up']))
 
-    os.chdir(abs_path)
     # Must call MPI finalize when process exit without exceptions
     cntk.distributed.Communicator.finalize()    

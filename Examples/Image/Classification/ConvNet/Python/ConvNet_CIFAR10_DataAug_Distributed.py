@@ -50,11 +50,11 @@ def create_image_mb_source(map_file, mean_file, train, total_number_of_samples):
     # deserializer
     return C.io.MinibatchSource(
         C.io.ImageDeserializer(map_file, C.io.StreamDefs(
-            features = C.io.StreamDef(field='image', transforms=transforms), # first column in map file is referred to as 'image'
-            labels   = C.io.StreamDef(field='label', shape=num_classes))),   # and second as 'label'
+            features=C.io.StreamDef(field='image', transforms=transforms), # first column in map file is referred to as 'image'
+            labels=C.io.StreamDef(field='label', shape=num_classes))),   # and second as 'label'
         randomize=train,
         max_samples=total_number_of_samples,
-        multithreaded_deserializer = True)
+        multithreaded_deserializer=True)
 
 # Create the network.
 def create_conv_network():
@@ -203,19 +203,19 @@ if __name__=='__main__':
     train_data=os.path.join(data_path, 'train_map.txt')
     test_data=os.path.join(data_path, 'test_map.txt')
 
-        convnet_cifar10_dataaug(train_data, test_data, mean_data,
-                                minibatch_size=args['minibatch_size'],
-                                epoch_size=args['epoch_size'],
-                                num_quantization_bits=args['quantized_bits'],
-                                block_size=args['block_samples'],
-                                warm_up=args['distributed_after'],
-                                max_epochs=args['num_epochs'],
-                                restore=not args['restart'],
-                                log_to_file=args['logdir'],
-                                num_mbs_per_log=100,
-                                gen_heartbeat=True,
-                                profiling=args['profile'],
-                                tensorboard_logdir=args['tensorboard_logdir'])
+    convnet_cifar10_dataaug(train_data, test_data, mean_data,
+                            minibatch_size=args['minibatch_size'],
+                            epoch_size=args['epoch_size'],
+                            num_quantization_bits=args['quantized_bits'],
+                            block_size=args['block_samples'],
+                            warm_up=args['distributed_after'],
+                            max_epochs=args['num_epochs'],
+                            restore=not args['restart'],
+                            log_to_file=args['logdir'],
+                            num_mbs_per_log=100,
+                            gen_heartbeat=True,
+                            profiling=args['profile'],
+                            tensorboard_logdir=args['tensorboard_logdir'])
     # Must call MPI finalize when process exit without exceptions
-        cntk.train.distributed.Communicator.finalize()
+    cntk.train.distributed.Communicator.finalize()
 

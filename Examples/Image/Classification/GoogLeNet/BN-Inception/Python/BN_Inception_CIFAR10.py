@@ -19,7 +19,7 @@ from cntk.learners import learning_rate_schedule, momentum_schedule, momentum_sg
 from cntk.logging import ProgressPrinter, log_number_of_parameters
 from cntk.losses import cross_entropy_with_softmax
 from cntk.metrics import classification_error
-from cntk.ops import input
+from cntk.ops import input_variable
 from cntk.train import training_session, CheckpointConfig, TestConfig, Trainer
 
 from BN_Inception import bn_inception_cifar_model
@@ -32,10 +32,10 @@ model_path = os.path.join(abs_path, "Models")
 log_dir = None
 
 # model dimensions
-image_height = 32
-image_width  = 32
-num_channels = 3  # RGB
-num_classes  = 10
+IMAGE_HEIGHT = 32
+IMAGE_WIDTH = 32
+NUM_CHANNELS = 3  # RGB
+NUM_CLASSES = 10
 
 # Create a minibatch source.
 def create_image_mb_source(map_file, mean_file, is_training, total_number_of_samples):
@@ -51,20 +51,20 @@ def create_image_mb_source(map_file, mean_file, is_training, total_number_of_sam
             ]
     else:
         transforms += [
-            xforms.crop(crop_type='center', crop_size=image_width)
+            xforms.crop(crop_type='center', crop_size=IMAGE_WIDTH)
         ]
 
     transforms += [
-        xforms.scale(width=image_width, height=image_height, channels=num_channels, interpolations='linear'),
+        xforms.scale(width=IMAGE_WIDTH, height=IMAGE_HEIGHT, channels=NUM_CHANNELS, interpolations='linear'),
         xforms.mean(mean_file)
     ]
 
     # deserializer
     return MinibatchSource(
         ImageDeserializer(map_file, StreamDefs(
-            features = StreamDef(field='image', transforms=transforms), # first column in map file is referred to as 'image'
-            labels   = StreamDef(field='label', shape=num_classes))),   # and second as 'label'
-        randomize = is_training,
+            features=StreamDef(field='image', transforms=transforms), # first column in map file is referred to as 'image'
+            labels=StreamDef(field='label', shape=NUM_CLASSES))),   # and second as 'label'
+        randomize=is_training,
         max_samples=total_number_of_samples,
         multithreaded_deserializer = True)
 
@@ -72,11 +72,11 @@ def create_image_mb_source(map_file, mean_file, is_training, total_number_of_sam
 def create_bn_inception():
 
     # Input variables denoting the features and label data
-    feature_var = input_variable((num_channels, image_height, image_width))
-    label_var = input_variable((num_classes))
+    feature_var = input_variable((NUM_CHANNELS, IMAGE_HEIGHT, IMAGE_WIDTH))
+    label_var = input_variable((NUM_CLASSES))
 
     bn_time_const = 4096
-    z = bn_inception_cifar_model(feature_var, num_classes, bn_time_const)
+    z = bn_inception_cifar_model(feature_var, NUM_CLASSES, bn_time_const)
 
     # loss and metric
     ce  = cross_entropy_with_softmax(z, label_var)
@@ -216,8 +216,6 @@ if __name__=='__main__':
 
     if args['outputdir'] is not None:
         model_path = args['outputdir'] + "/models"
-    if args['datadir'] is not None:
-        data_path = args['datadir']
     if args['logdir'] is not None:
         log_dir = args['logdir']    
     if args['profilerdir'] is not None:
@@ -225,28 +223,22 @@ if __name__=='__main__':
     if args['device'] is not None:
         cntk.device.set_default_device(cntk.device.gpu(args['device']))
 
+    data_path = args['datadir']
+    
+    if not os.path.isdir(data_path):
+        raise RuntimeError("Directory %s does not exist" % data_path)
+
     mean_data = os.path.join(data_path, 'CIFAR-10_mean.xml')
     train_data = os.path.join(data_path, 'train_map.txt')
     test_data = os.path.join(data_path, 'test_map.txt')
 
-    # Find the mean file
-    if not os.path.exists(mean_data):
-        mean_data = os.path.join(data_path, 'CIFAR-10_mean.xml')
-    if not os.path.exists(mean_data):
-        mean_data = os.path.join(data_path, 'CIFAR-10_mean.xml')
-    if not os.path.exists(mean_data):
-        raise RuntimeError("Can not find the mean file. Please put the 'CIFAR-10_mean.xml' file in Data Directory or Config Directory.")
-
     os.chdir(data_path)
-    try:
-        bn_inception_train_and_eval(train_data, test_data, mean_data,
-                                    minibatch_size=args['minibatch_size'],
-                                    epoch_size=args['epoch_size'],
-                                    max_epochs=args['num_epochs'],
-                                    restore=not args['restart'],
-                                    log_to_file=args['logdir'],
-                                    num_mbs_per_log=100,
-                                    gen_heartbeat=True,
-                                    profiler_dir=args['profilerdir'])
-    finally:
-        os.chdir(abs_path)
+    bn_inception_train_and_eval(train_data, test_data, mean_data,
+                                minibatch_size=args['minibatch_size'],
+                                epoch_size=args['epoch_size'],
+                                max_epochs=args['num_epochs'],
+                                restore=not args['restart'],
+                                log_to_file=args['logdir'],
+                                num_mbs_per_log=100,
+                                gen_heartbeat=True,
+                                profiler_dir=args['profilerdir'])

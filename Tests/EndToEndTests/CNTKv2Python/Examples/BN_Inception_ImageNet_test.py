@@ -32,6 +32,7 @@ def test_bn_inception_imagenet(device_id):
         pytest.skip('test only runs on GPU')
     try_set_default_device(cntk_device(device_id))
 
+    current_path = os.getcwd()
     base_path = prepare_ImageNet_data()
     # change dir to locate data.zip correctly
     os.chdir(base_path)
@@ -40,12 +41,15 @@ def test_bn_inception_imagenet(device_id):
     set_fixed_random_seed(1)
     force_deterministic_algorithms()
 
-    mean_data = os.path.join(base_path, '..', 'ImageNet1K_mean.xml')
+    mean_data = os.path.join(base_path, 'ImageNet1K_mean.xml')
     train_data = os.path.join(base_path, 'train_map.txt')
     test_data = os.path.join(base_path, 'val_map.txt')
 
-    error = bn_inception_train_and_eval(train_data, test_data, mean_data, minibatch_size=32, epoch_size=200,
-                                max_epochs=4, restore=False, testing_parameters=(200,32))
+    try:
+        error = bn_inception_train_and_eval(train_data, test_data, mean_data, minibatch_size=16, epoch_size=200,
+                                    max_epochs=4, restore=False, testing_parameters=(200,32))
+    finally:
+        os.chdir(current_path)
 
     expected_error = 0.99
     assert np.allclose(error, expected_error, atol=TOLERANCE_ABSOLUTE)
