@@ -1,53 +1,56 @@
 from __future__ import print_function
 import os, sys, importlib
-import shutil, time
+import shutil, time, datetime
 import subprocess
+from cntk_helpers import getFilesInDirectory
 import PARAMETERS
-locals().update(importlib.import_module("PARAMETERS").__dict__)
 
 
-####################################
-# Parameters
-####################################
-cntkCmdStrPattern = "cntk.exe configFile={0}fastrcnn.cntk currentDirectory={0} {1}"
 
-# cntk arguments
-NumLabels = nrClasses
+def run_fastrcnn_with_config_file():
+    ####################################
+    # Parameters
+    ####################################
+    p = PARAMETERS.get_parameters_for_dataset()
+    cntkCmdStrPattern = "cntk.exe configFile={0}/fastrcnn.cntk currentDirectory={0} {1}"
 
-NumTrainROIs = cntk_nrRois
-TrainROIDim = cntk_nrRois * 4
-TrainROILabelDim = cntk_nrRois * nrClasses
+    # cntk arguments
+    NumLabels = p.nrClasses
 
-NumTestROIs = cntk_nrRois
-TestROIDim = cntk_nrRois * 4
-TestROILabelDim = cntk_nrRois * nrClasses
+    NumTrainROIs = p.cntk_nrRois
+    TrainROIDim = p.cntk_nrRois * 4
+    TrainROILabelDim = p.cntk_nrRois * p.nrClasses
 
-cntk_args = "NumLabels={} NumTrainROIs={}".format(NumLabels, NumTrainROIs)
-cntk_args += " TrainROIDim={} TrainROILabelDim={}".format(TrainROIDim, TrainROILabelDim)
-cntk_args += " NumTestROIs={}".format(NumTestROIs)
-cntk_args += " TestROIDim={} TestROILabelDim={}".format(TestROIDim, TestROILabelDim)
+    NumTestROIs = p.cntk_nrRois
+    TestROIDim = p.cntk_nrRois * 4
+    TestROILabelDim = p.cntk_nrRois * p.nrClasses
 
-####################################
-# Main
-####################################
-# copy config file
-shutil.copy(cntkTemplateDir + "fastrcnn.cntk", cntkFilesDir)
+    cntk_args = "NumLabels={} NumTrainROIs={}".format(NumLabels, NumTrainROIs)
+    cntk_args += " TrainROIDim={} TrainROILabelDim={}".format(TrainROIDim, TrainROILabelDim)
+    cntk_args += " NumTestROIs={}".format(NumTestROIs)
+    cntk_args += " TestROIDim={} TestROILabelDim={}".format(TestROIDim, TestROILabelDim)
 
-# run cntk
-tstart = datetime.datetime.now()
-os.environ['ACML_FMA'] = str(0)
-cmdStr = cntkCmdStrPattern.format(cntkFilesDir, cntk_args)
-print (cmdStr)
-pid = subprocess.Popen(cmdStr, cwd = cntkFilesDir)
-pid.wait()
-print ("Time running cntk [s]: " + str((datetime.datetime.now() - tstart).total_seconds()))
+    # copy config file
+    shutil.copy(os.path.join(p.cntkTemplateDir, "fastrcnn.cntk"), p.cntkFilesDir)
+    # run cntk
+    tstart = datetime.datetime.now()
+    os.environ['ACML_FMA'] = str(0)
+    cmdStr = cntkCmdStrPattern.format(p.cntkFilesDir, cntk_args)
+    print (cmdStr)
+    pid = subprocess.Popen(cmdStr, cwd=p.cntkFilesDir)
+    pid.wait()
+    print ("Time running cntk [s]: " + str((datetime.datetime.now() - tstart).total_seconds()))
 
-# delete intermediate model files written during cntk training
-modelDir = cntkFilesDir + "Output/"
-filenames = getFilesInDirectory(modelDir, postfix = None)
-for filename in filenames:
-    if "Fast-RCNN.model." in filename:
-        os.remove(modelDir + filename)
-assert pid.returncode == 0, "ERROR: cntk ended with exit code {}".format(pid.returncode)
+    # delete intermediate model files written during cntk training
+    modelDir = os.path.join(p.cntkFilesDir , "Output")
+    filenames = getFilesInDirectory(modelDir, postfix = None)
+    for filename in filenames:
+        if "Fast-RCNN.model." in filename:
+            os.remove(os.path.join(modelDir, filename))
+    assert pid.returncode == 0, "ERROR: cntk ended with exit code {}".format(pid.returncode)
 
-print ("DONE.")
+    print ("DONE.")
+    return True
+
+if __name__=='__main__':
+    run_fastrcnn_with_config_file()

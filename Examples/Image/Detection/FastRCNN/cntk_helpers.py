@@ -230,7 +230,7 @@ def parseCntkOutput(cntkImgsListPath, cntkOutputPath, outParsedDir, cntkNrRois, 
 
             # save
             data = np.array(data, np.float32)
-            outPath = outParsedDir + str(imgIndex) + ".dat"
+            outPath = os.path.join(outParsedDir, str(imgIndex) + ".dat")
             if saveCompressed:
                 np.savez_compressed(outPath, data)
             else:
@@ -617,7 +617,7 @@ def deleteAllFilesInDirectory(directory, fileEndswithString, boPromptUser = Fals
             exit()
     for filename in getFilesInDirectory(directory):
         if fileEndswithString == None or filename.lower().endswith(fileEndswithString):
-            deleteFile(directory + "/" + filename)
+            deleteFile(os.path.join(directory, filename))
 
 def removeLineEndCharacters(line):
     if line.endswith(b'\r\n'):
