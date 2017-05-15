@@ -6,7 +6,6 @@ from cntk_helpers import getFilesInDirectory
 import PARAMETERS
 
 
-
 def run_fastrcnn_with_config_file():
     ####################################
     # Parameters
@@ -34,7 +33,7 @@ def run_fastrcnn_with_config_file():
     shutil.copy(os.path.join(p.cntkTemplateDir, "fastrcnn.cntk"), p.cntkFilesDir)
     # run cntk
     tstart = datetime.datetime.now()
-    os.environ['ACML_FMA'] = str(0)
+
     cmdStr = cntkCmdStrPattern.format(p.cntkFilesDir, cntk_args)
     print (cmdStr)
     pid = subprocess.Popen(cmdStr, cwd=p.cntkFilesDir)

@@ -8,13 +8,14 @@ import PARAMETERS
 ####################################
 image_set = 'test'      # 'train', 'test'
 
-p = PARAMETERS.get_parameters_for_dataset()
-# no need to change these parameters
-boUseNonMaximaSurpression = True
-visualizationDir = os.path.join(p.resultsDir, "visualizations")
-cntkParsedOutputDir = os.path.join(p.cntkFilesDir, image_set + "_parsed")
-
 def visualize_output_rois(testing=False):
+    p = PARAMETERS.get_parameters_for_dataset()
+
+    # no need to change these parameters
+    boUseNonMaximaSurpression = True
+    visualizationDir = os.path.join(p.resultsDir, "visualizations")
+    cntkParsedOutputDir = os.path.join(p.cntkFilesDir, image_set + "_parsed")
+
     makeDirectory(p.resultsDir)
     makeDirectory(visualizationDir)
 

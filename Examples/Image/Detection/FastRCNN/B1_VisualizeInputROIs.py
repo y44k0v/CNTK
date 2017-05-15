@@ -4,7 +4,6 @@ from cntk_helpers import *
 import PARAMETERS
 
 
-p = PARAMETERS.get_parameters_for_dataset()
 ####################################
 # Parameters
 ####################################
@@ -17,6 +16,8 @@ nmsThreshold = 0.1
 
 
 def generate_rois_visualization(testing=False):
+    p = PARAMETERS.get_parameters_for_dataset()
+
     print ("Load ROI co-ordinates and labels")
     cntkImgsPath, cntkRoiCoordsPath, cntkRoiLabelsPath, nrRoisPath = getCntkInputPaths(p.cntkFilesDir, image_set)
     imgPaths = getColumn(readTable(cntkImgsPath), 1)

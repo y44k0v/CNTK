@@ -10,7 +10,7 @@ from cntk import *
 from cntk.initializer import glorot_uniform
 from cntk.io import MinibatchSource, ImageDeserializer, CTFDeserializer, StreamDefs, StreamDef
 from cntk.io.transforms import scale
-from cntk.layers import placeholder, constant
+from cntk.layers import placeholder, Constant
 from cntk.learners import momentum_sgd, learning_rate_schedule, momentum_as_time_constant_schedule
 from cntk.logging import log_number_of_parameters, ProgressPrinter
 from cntk.logging.graph import find_by_name, plot
@@ -18,7 +18,7 @@ import PARAMETERS
 import numpy as np
 import os, sys
 
-　
+
 ###############################################################
 ###############################################################
 abs_path = os.path.dirname(os.path.abspath(__file__))
@@ -60,7 +60,7 @@ else:
 ###############################################################
 ###############################################################
 
-　
+
 # Instantiates a composite minibatch source for reading images, roi coordinates and roi labels for training Fast R-CNN
 def create_mb_source(img_height, img_width, img_channels, n_classes, n_rois, data_path, data_set):
     rois_dim = 4 * n_rois
@@ -95,7 +95,7 @@ def create_mb_source(img_height, img_width, img_channels, n_classes, n_rois, dat
     # define a composite reader
     return MinibatchSource([image_source, roi_source, label_source], epoch_size=sys.maxsize, randomize=data_set == "train")
 
-　
+
 # Defines the Fast R-CNN network model for detecting objects in images
 def frcn_predictor(features, rois, n_classes, model_path):
     # Load the pretrained classification net and find nodes
@@ -123,7 +123,7 @@ def frcn_predictor(features, rois, n_classes, model_path):
 
     return z
 
-　
+
 # Trains a Fast R-CNN model
 def train_fast_rcnn(debug_output=False, model_path=model_file):
     if debug_output:
@@ -179,7 +179,7 @@ def train_fast_rcnn(debug_output=False, model_path=model_file):
 
     return frcn_output
 
-　
+
 # Evaluate a Fast R-CNN model
 def evaluate_fast_rcnn(model):
     test_minibatch_source = create_mb_source(image_height, image_width, num_channels,
@@ -203,7 +203,7 @@ def evaluate_fast_rcnn(model):
 
     return True
 
-　
+
 # The main method trains and evaluates a Fast R-CNN model.
 # If a trained model is already available it is loaded an no training will be performed.
 if __name__ == '__main__':
