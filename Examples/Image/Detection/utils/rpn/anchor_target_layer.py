@@ -23,7 +23,7 @@ class AnchorTargetLayer(UserFunction):
     labels and bounding-box regression targets.
     """
 
-    def __init__(self, arg1, arg2, name='AnchorTargetLayer', im_info=None, cfg=None):
+    def __init__(self, arg1, arg2, name='AnchorTargetLayer', im_info=None, cfg=None, deterministic=False):
         super(AnchorTargetLayer, self).__init__([arg1, arg2], name=name)
         #layer_params = yaml.load(self.param_str_)
         anchor_scales = (8, 16, 32) #layer_params.get('scales', (8, 16, 32))
@@ -32,6 +32,7 @@ class AnchorTargetLayer(UserFunction):
         self._feat_stride = 16 #layer_params['feat_stride']
         self._im_info = im_info
         self._cfg = cfg
+        self._determininistic_mode = deterministic
 
         self._EPS = 1e-14 if cfg is None else cfg.EPS
         self._TRAIN_RPN_CLOBBER_POSITIVES = False if cfg is None else cfg["TRAIN"].RPN_CLOBBER_POSITIVES
@@ -180,16 +181,20 @@ class AnchorTargetLayer(UserFunction):
         num_fg = int(self._TRAIN_RPN_FG_FRACTION * self._TRAIN_RPN_BATCHSIZE)
         fg_inds = np.where(labels == 1)[0]
         if len(fg_inds) > num_fg:
-            disable_inds = npr.choice(
-                fg_inds, size=(len(fg_inds) - num_fg), replace=False)
+            if self._determininistic_mode:
+                disable_inds = fg_inds[:(len(fg_inds) - num_fg)]
+            else:
+                disable_inds = npr.choice(fg_inds, size=(len(fg_inds) - num_fg), replace=False)
             labels[disable_inds] = -1
 
         # subsample negative labels if we have too many
         num_bg = self._TRAIN_RPN_BATCHSIZE - np.sum(labels == 1)
         bg_inds = np.where(labels == 0)[0]
         if len(bg_inds) > num_bg:
-            disable_inds = npr.choice(
-                bg_inds, size=(len(bg_inds) - num_bg), replace=False)
+            if self._determininistic_mode:
+                disable_inds = bg_inds[:(len(bg_inds) - num_bg)]
+            else:
+                disable_inds = npr.choice(bg_inds, size=(len(bg_inds) - num_bg), replace=False)
             labels[disable_inds] = -1
 
         bbox_targets = np.zeros((len(inds_inside), 4), dtype=np.float32)

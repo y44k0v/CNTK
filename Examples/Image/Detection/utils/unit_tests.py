@@ -1,5 +1,6 @@
 import os, sys
 abs_path = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(os.path.join(abs_path))
 sys.path.append(os.path.join(abs_path, ".."))
 
 import pytest
@@ -7,8 +8,10 @@ import numpy as np
 from cntk import input as input_variable, user_function
 from rpn.proposal_layer import ProposalLayer as CntkProposalLayer
 from rpn.proposal_target_layer import ProposalTargetLayer as CntkProposalTargetLayer
+from rpn.anchor_target_layer import AnchorTargetLayer as CntkAnchorTargetLayer
 from caffe_layers.proposal_layer_caffe import ProposalLayer as CaffeProposalLayer
 from caffe_layers.proposal_target_layer_caffe import ProposalTargetLayer as CaffeProposalTargetLayer
+from caffe_layers.anchor_target_layer_caffe import AnchorTargetLayer as CaffeAnchorTargetLayer
 
 def test_proposal_layer():
     cls_prob_shape_cntk = (2,9,61,61)
@@ -60,13 +63,18 @@ def test_proposal_layer():
     print("Verified ProposalLayer")
 
 def test_proposal_target_layer():
-    all_rois_shape_cntk = (400,4)
+    num_rois = 400
+    all_rois_shape_cntk = (num_rois,4)
     num_gt_boxes = 50
-    gt_boxes_shape_cntk = (50,5)
+    gt_boxes_shape_cntk = (num_gt_boxes,5)
     im_info = [1000, 1000, 1]
 
     # Create input tensors with values
-    all_rois = np.random.random_sample(all_rois_shape_cntk).astype(np.float32)
+    x1y1 = np.random.random_sample((num_rois, 2)) * 500
+    wh = np.random.random_sample((num_rois, 2)) * 400
+    x2y2 = x1y1 + wh + 50
+    all_rois = np.hstack((x1y1, x2y2)).astype(np.float32)
+    #all_rois = np.random.random_sample(all_rois_shape_cntk).astype(np.float32)
 
     x1y1 = np.random.random_sample((num_gt_boxes, 2)) * 500
     wh = np.random.random_sample((num_gt_boxes, 2)) * 400
@@ -121,9 +129,69 @@ def test_proposal_target_layer():
     assert cntk_labels.shape == caffe_labels.shape
     assert cntk_bbox_targets.shape == caffe_bbox_targets.shape
     assert cntk_bbox_inside_weights.shape == caffe_bbox_inside_weights.shape
+
+    caffe_labels = [int(x) for x in caffe_labels]
+
     assert np.allclose(cntk_rois, caffe_rois, rtol=0.0, atol=0.0)
+    assert np.allclose(cntk_labels, caffe_labels, rtol=0.0, atol=0.0)
+    assert np.allclose(cntk_bbox_targets, caffe_bbox_targets, rtol=0.0, atol=0.0)
+    assert np.allclose(cntk_bbox_inside_weights, caffe_bbox_inside_weights, rtol=0.0, atol=0.0)
     print("Verified ProposalTargetLayer")
+
+def test_anchor_target_layer():
+    rpn_cls_score_shape_cntk = (1, 18, 61, 61)
+    num_gt_boxes = 50
+    gt_boxes_shape_cntk = (num_gt_boxes,5)
+    im_info = [1000, 1000, 1]
+
+    # Create input tensors with values
+    rpn_cls_score_dummy = np.random.random_sample(rpn_cls_score_shape_cntk).astype(np.float32)
+
+    x1y1 = np.random.random_sample((num_gt_boxes, 2)) * 500
+    wh = np.random.random_sample((num_gt_boxes, 2)) * 400
+    x2y2 = x1y1 + wh + 50
+    label = np.random.random_sample((num_gt_boxes, 1))
+    label = (label * 17.0)
+    gt_boxes = np.hstack((x1y1, x2y2, label)).astype(np.float32)
+
+    # Create CNTK layer and call forward
+    rpn_cls_score_var = input_variable(rpn_cls_score_shape_cntk)
+    gt_boxes_var = input_variable(gt_boxes_shape_cntk)
+
+    cntk_layer = user_function(CntkAnchorTargetLayer(rpn_cls_score_var, gt_boxes_var, im_info=im_info, deterministic=True))
+    state, cntk_output = cntk_layer.forward({rpn_cls_score_var: [rpn_cls_score_dummy], gt_boxes_var: [gt_boxes]})
+
+    obj_key = [k for k in cntk_output if 'objectness_target' in str(k)][0]
+    bbt_key = [k for k in cntk_output if 'rpn_bbox_target' in str(k)][0]
+    bbw_key = [k for k in cntk_output if 'rpn_bbox_inside_w' in str(k)][0]
+
+    cntk_objectness_target = cntk_output[obj_key][0]
+    cntk_bbox_targets = cntk_output[bbt_key][0]
+    cntk_bbox_inside_w = cntk_output[bbw_key][0]
+
+    # Create Caffe layer and call forward
+    bottom = [np.array(rpn_cls_score_dummy),np.array(gt_boxes), np.array(im_info)]
+    top = None # handled through return statement in caffe layer for unit testing
+
+    param_str = "'feat_stride': 16"
+    caffe_layer = CaffeAnchorTargetLayer()
+    caffe_layer.set_param_str(param_str)
+    caffe_layer.setup(bottom, top)
+    caffe_layer.set_deterministic_mode()
+
+    caffe_objectness_target, caffe_bbox_targets, caffe_bbox_inside_w = caffe_layer.forward(bottom, top)
+
+    # assert that results are exactly the same
+    assert cntk_objectness_target.shape == caffe_objectness_target.shape
+    assert cntk_bbox_targets.shape == caffe_bbox_targets.shape
+    assert cntk_bbox_inside_w.shape == caffe_bbox_inside_w.shape
+
+    assert np.allclose(cntk_objectness_target, caffe_objectness_target, rtol=0.0, atol=0.0)
+    assert np.allclose(cntk_bbox_targets, caffe_bbox_targets, rtol=0.0, atol=0.0)
+    assert np.allclose(cntk_bbox_inside_w, caffe_bbox_inside_w, rtol=0.0, atol=0.0)
+    print("Verified AnchorTargetLayer")
 
 if __name__ == '__main__':
     test_proposal_layer()
     test_proposal_target_layer()
+    test_anchor_target_layer()
