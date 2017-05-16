@@ -435,7 +435,7 @@ def visualizeResults(imgPath, roiLabels, roiScores, roiRelCoords, padWidth, padH
                 drawRectangles(imgDebug, [rect], color=color, thickness=thickness)
             elif iter == 2 and label > 0:
                 if not nmsKeepIndices or (roiIndex in nmsKeepIndices):
-                    font = ImageFont.truetype("arial.ttf", 18)
+                    font = ImageFont.truetype(available_font, 18)
                     text = classes[label]
                     if roiScores:
                         text += "(" + str(round(score, 2)) + ")"

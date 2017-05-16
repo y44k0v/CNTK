@@ -11,7 +11,7 @@ def run_fastrcnn_with_config_file():
     # Parameters
     ####################################
     p = PARAMETERS.get_parameters_for_dataset()
-    cntkCmdStrPattern = "cntk.exe configFile={0}/fastrcnn.cntk currentDirectory={0} {1}"
+    cntkCmdStrPattern = "cntk configFile={0}/fastrcnn.cntk currentDirectory={0} {1}"
 
     # cntk arguments
     NumLabels = p.nrClasses
