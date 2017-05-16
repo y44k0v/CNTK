@@ -26,12 +26,12 @@ script_under_test = os.path.join(example_dir, "BN_Inception_ImageNet_Distributed
 
 mpiexec_params = [ "-n", "2"]
 
-def test_bn_inception_imagenet_distributed(device_id):
-    params = [ "-n", "4",
-               "-datadir", prepare_ImageNet_data(),
-               "-q", "32",
-               "-e", "300",
-               "-m", "2",
-               "-r",
-               "-device", str(device_id) ]
-    mpiexec_test(device_id, script_under_test, mpiexec_params, params, 0.99, True)
+#def test_bn_inception_imagenet_distributed(device_id):
+#    params = [ "-n", "4",
+#               "-datadir", prepare_ImageNet_data(),
+#               "-q", "32",
+#               "-e", "300",
+#               "-m", "2",
+#               "-r",
+#               "-device", str(device_id) ]
+#    mpiexec_test(device_id, script_under_test, mpiexec_params, params, 0.99, True)
