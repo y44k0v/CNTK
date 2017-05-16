@@ -13,6 +13,10 @@ from easydict import EasyDict
 from fastRCNN.nms import nms as nmsPython
 from builtins import range
 
+import cv2, copy, textwrap
+from PIL import Image, ImageFont, ImageDraw
+from PIL.ExifTags import TAGS
+
 available_font = "arial.ttf"
 try:
     dummy = ImageFont.truetype(available_font, 16)
@@ -441,7 +445,10 @@ def visualizeResults(imgPath, roiLabels, roiScores, roiRelCoords, padWidth, padH
                 drawRectangles(imgDebug, [rect], color=color, thickness=thickness)
             elif iter == 2 and label > 0:
                 if not nmsKeepIndices or (roiIndex in nmsKeepIndices):
-                    font = ImageFont.truetype(available_font, 18)
+                    try:
+                        font = ImageFont.truetype(available_font, 18)
+                    except:
+                        font = ImageFont.load_default()
                     text = classes[label]
                     if roiScores:
                         text += "(" + str(round(score, 2)) + ")"
@@ -560,10 +567,6 @@ def im_detect(net, im, boxes, feature_scale=None, bboxIndices=None, boReturnClas
 #    slotTag       = e.g. "<movie>" or "</movie>" in: play <movie> terminator </movie>
 #    slotName      = e.g. "movie" in: play <movie> terminator </movie>
 #    slot          = e.g. "<movie> terminator </movie>" in: play <movie> terminator </movie>
-
-import cv2, copy, textwrap
-from PIL import Image, ImageFont, ImageDraw
-from PIL.ExifTags import TAGS
 
 def makeDirectory(directory):
     if not os.path.exists(directory):

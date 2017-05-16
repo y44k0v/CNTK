@@ -19,12 +19,6 @@ sys.path.append(abs_path)
 sys.path.append(os.path.join(abs_path, "..", "..", "..", "..", "Examples", "Image", "Detection", "FastRCNN"))
 
 from prepare_test_data import prepare_Grocery_data
-from A1_GenerateInputROIs import generate_input_rois
-from A2_RunWithBSModel import run_fastrcnn_with_config_file
-from A3_ParseAndEvaluateOutput import evaluate_output
-from B1_VisualizeInputROIs import generate_rois_visualization
-from B2_EvaluateInputROIs import evaluate_rois
-from B3_VisualizeOutputROIs import visualize_output_rois
 
 grocery_path = prepare_Grocery_data()
 
@@ -34,22 +28,27 @@ linux_only = pytest.mark.skipif(sys.platform == 'win32', reason="it runs current
 @python34_only
 @linux_only
 def test_fastrcnn_grocery_visualization():
+    from A1_GenerateInputROIs import generate_input_rois
     assert generate_input_rois(testing=True)
 
+    from B1_VisualizeInputROIs import generate_rois_visualization
     assert generate_rois_visualization(testing=True)
 
+    from B2_EvaluateInputROIs import evaluate_rois
     assert evaluate_rois()
 
 @python34_only
 @linux_only
 def test_fastrcnn_with_config_file(device_id):
-    assert generate_input_rois(testing=True)
-
     if cntk_device(device_id).type() != DeviceKind_GPU:
         pytest.skip('test only runs on GPU') # it runs very slow in CPU
     try_set_default_device(cntk_device(device_id))
 
-    assert run_fastrcnn_with_config_file()
+    from A1_GenerateInputROIs import generate_input_rois
+    assert generate_input_rois(testing=True)
+
+    from A2_RunWithBSModel import run_fastrcnn_with_config_file
+    assert run_fastrcnn_with_config_file(os.environ["TEST_CNTK_BINARY"])
 
 @python34_only
 @linux_only
@@ -58,6 +57,7 @@ def test_fastrcnn_grocery_training(device_id):
         pytest.skip('test only runs on GPU') # it runs very slow in CPU
     try_set_default_device(cntk_device(device_id))
 
+    from A1_GenerateInputROIs import generate_input_rois
     assert generate_input_rois(testing=True)
 
     # since we do not use a reader for evaluation we need unzipped data
@@ -70,11 +70,12 @@ def test_fastrcnn_grocery_training(device_id):
         model_file = os.path.join(abs_path, *"../../../../Examples/Image/PretrainedModels/AlexNet.model".split("/"))
 
     from A2_RunWithPyModel import train_fast_rcnn, evaluate_fast_rcnn
-
     trained_model = train_fast_rcnn(model_path=model_file)
 
     assert evaluate_fast_rcnn(trained_model)
 
+    from A3_ParseAndEvaluateOutput import evaluate_output
     assert evaluate_output()
 
+    from B3_VisualizeOutputROIs import visualize_output_rois
     assert visualize_output_rois(testing=True)
