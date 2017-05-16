@@ -28,10 +28,10 @@ from B3_VisualizeOutputROIs import visualize_output_rois
 
 grocery_path = prepare_Grocery_data()
 
-python34_only = pytest.mark.skipif(sys.version_info[:2] ! (3,4), reason="requires python 3.4")
+python34_only = pytest.mark.skipif(sys.version_info[:2] != (3,4), reason="requires python 3.4")
 linux_only = pytest.mark.skipif(sys.platform == 'win32', reason="it runs currently only in linux")
 
-@python3_only
+@python34_only
 @linux_only
 def test_fastrcnn_grocery_visualization():
     assert generate_input_rois(testing=True)
@@ -40,7 +40,7 @@ def test_fastrcnn_grocery_visualization():
 
     assert evaluate_rois()
 
-@python3_only
+@python34_only
 @linux_only
 def test_fastrcnn_with_config_file(device_id):
     assert generate_input_rois(testing=True)
@@ -51,7 +51,7 @@ def test_fastrcnn_with_config_file(device_id):
 
     assert run_fastrcnn_with_config_file()
 
-@python3_only
+@python34_only
 @linux_only
 def test_fastrcnn_grocery_training(device_id):
     if cntk_device(device_id).type() != DeviceKind_GPU:
