@@ -127,7 +127,7 @@ def prepare_resnet_v1_model():
     dst_file = "Examples/Image/PretrainedModels/ResNet_18.model"
     
     _data_copier([src_file], [dst_file])
-    
+
 # Read the flower and animal data set file
 def prepare_flower_data():
     src_files = ["Image/Flowers/102flowers.tgz", 
@@ -137,12 +137,23 @@ def prepare_flower_data():
     dst_files = ["Examples/Image/DataSets/Flowers/102flowers.tgz", 
                  "Examples/Image/DataSets/Flowers/imagelabels.mat", 
                  "Examples/Image/DataSets/Flowers/imagelabels.mat"]  
-    
+
     _data_copier(src_files, dst_files)
-    
+
 def prepare_animals_data():
     src_file = "Image/Animals/Animals.zip"
     dst_file = "Examples/Image/DataSets/Animals/Animals.zip"
     
     _data_copier([src_file], [dst_file])
 
+def prepare_alexnet_v0_model():
+    local_base_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                         *"../../../../Examples/Image/PretrainedModels".split("/"))
+    local_base_path = os.path.normpath(local_base_path)
+
+    model_file = os.path.join(local_base_path, "AlexNet.model")
+
+    if not os.path.isfile(model_file):
+        external_model_path = os.path.join(os.environ[envvar], "PreTrainedModels", "AlexNet", "v0", "AlexNet.model")
+        copyfile(external_model_path, model_file)
+    return local_base_path

@@ -18,7 +18,7 @@ abs_path = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(abs_path)
 sys.path.append(os.path.join(abs_path, "..", "..", "..", "..", "Examples", "Image", "Detection", "FastRCNN"))
 
-from prepare_test_data import prepare_Grocery_data
+from prepare_test_data import prepare_Grocery_data, prepare_alexnet_v0_model
 
 grocery_path = prepare_Grocery_data()
 
@@ -46,6 +46,8 @@ def test_fastrcnn_with_config_file(device_id):
 
     from A1_GenerateInputROIs import generate_input_rois
     assert generate_input_rois(testing=True)
+
+    prepare_alexnet_v0_model()
 
     from A2_RunWithBSModel import run_fastrcnn_with_config_file
     assert run_fastrcnn_with_config_file(os.environ["TEST_CNTK_BINARY"])
