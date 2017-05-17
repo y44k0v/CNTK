@@ -100,6 +100,7 @@ namespace CNTK
         {PrimitiveOpType::UnpackSequence, L"UnpackSequenceOp"},
         {PrimitiveOpType::Assign, L"Assign" },
         {PrimitiveOpType::Gather, L"Gather"},
+        {PrimitiveOpType::StableSigmoid, L"StableSigmoid"},
     };
 
     inline const std::wstring& PrimitiveOpTypeName(PrimitiveOpType opType)
@@ -741,9 +742,12 @@ namespace CNTK
             return MakeSharedObject<PrimitiveFunction>(OpType(), clonedInputs, Dictionary(Attributes()), Name());
         }
 
+        void SetDropoutRate(double dropoutRate);
+
+        void SetRandomSeed(size_t seed);
+
     private:
         PrimitiveOpType m_op;
-
         // Increasing s_serializationVersion every time we add more ops allows us to print 
         // a more meaningful message when trying to load a new model with a stale binary. 
         // version 1: initial version.
@@ -757,7 +761,8 @@ namespace CNTK
         // Version 11: Add ToSequence, ToSequenceLike and UnpackSequence operators.
         // Version 12: Add Assign node.
         // Version 13: Add Gather op.
-        static const size_t s_serializationVersion = 13;
+        // Version 14: Add StableSigmoid
+        static const size_t s_serializationVersion = 14;
     };
 
     std::vector<DictionaryValue> GetInputUids(const Function& f);
