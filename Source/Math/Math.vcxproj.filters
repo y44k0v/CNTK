@@ -137,6 +137,9 @@
     <ClInclude Include="CPUMatrixImpl.h">
       <Filter>CPU</Filter>
     </ClInclude>
+    <ClInclude Include="..\Common\Include\Constants.h">
+      <Filter>Common\Include</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="GPUMatrix.h">

@@ -652,4 +652,23 @@ template <class ElemType>
 template class LearnableParameter<float>;
 template class LearnableParameter<double>;
 
+
+template <class ElemType>
+/*virtual*/ void RandomUniform<ElemType>::ForwardProp(const FrameRange& fr) /*override*/
+{
+    auto&& result = ValueFor(fr);
+    //We call random uniform straight on the undelying buffer
+    result.SetUniformRandomValue(GetRNGHandle());
+    UpdateRngOffset(GetRngOffset() + result.GetNumElements());
+}
+
+template <class ElemType>
+/*virtual*/ void RandomUniform<ElemType>::BackpropTo(const size_t /*inputIndex*/, const FrameRange&) /*override*/
+{
+    LogicError("%ls %ls operation is a random variable and cannot BackpropTo() it.", NodeName().c_str(), OperationName().c_str());
+}
+
+template class RandomUniform<float>;
+template class RandomUniform<double>;
+
 }}}

@@ -1020,6 +1020,21 @@ void CPUMatrix<ElemType>::SetUniformRandomValue(const ElemType low, const ElemTy
 }
 
 template <class ElemType>
+void CPUMatrix<ElemType>::SetUniformRandomValue(RNGHandle& rngHandle)
+{
+    if (IsEmpty())
+        LogicError("SetUniformRandomValue: Matrix is empty.");
+
+    CPURNGHandle* cpuRNGHandle = dynamic_cast<CPURNGHandle*>(&rngHandle);
+    if (cpuRNGHandle == nullptr)
+        LogicError("rngHandle must be a CPURNGHandle.");
+
+    boost::random::uniform_real_distribution<ElemType> r(0, 1);
+    std::generate(Data(), Data() + GetNumElements(), [&cpuRNGHandle, &r]() {return r(cpuRNGHandle->Generator()); });
+}
+
+
+template <class ElemType>
 void CPUMatrix<ElemType>::SetGaussianRandomValue(const ElemType mean, const ElemType sigma, unsigned long seed)
 {
     if (sigma <= 0)

@@ -1496,6 +1496,20 @@ void Matrix<ElemType>::SetUniformRandomValue(const ElemType low, const ElemType 
 }
 
 template <class ElemType>
+void Matrix<ElemType>::SetUniformRandomValue(RNGHandle& rngHandle)
+{
+    if (IsEmpty())
+        return;
+
+    DISPATCH_MATRIX_ON_FLAG(this,
+        this,
+        m_CPUMatrix->SetUniformRandomValue(rngHandle),
+        m_GPUMatrix->SetUniformRandomValue(rngHandle),
+        NOT_IMPLEMENTED,
+        NOT_IMPLEMENTED);
+}
+
+template <class ElemType>
 void Matrix<ElemType>::SetGaussianRandomValue(const ElemType mean, const ElemType sigma, unsigned long seed)
 {
     if (sigma <= 0)
