@@ -526,13 +526,34 @@ namespace CNTK
         else
         {
             assert(variable.IsOutput());
-            auto outputVariableNode = GetOutputVariableNode(variable, network, builder, fullyDefinedArgumentsMap, variableToNodeMap, isVariableRootMap, inputsToExcludeGradientsFor, useMangledNamesForComputationNodes);
-            // Can be null in case of loops with f.output == f.input.
-            // Such loops cannot be handled, so we leave nullptr as computational node.
-            if (outputVariableNode)
-                computationNodePtr = outputVariableNode->template As<ComputationNode<ElementType>>()->shared_from_this();
-            else
-                computationNodePtr = nullptr;
+            if (variable.Owner()->OpName() == L"RandomUniform")
+            {
+                //These checks are similar but different from the input variable checks
+                if (variable.Shape().HasUnboundDimension())
+                    InvalidArgument("Random Variable '%ls' with unresolved shape %ls found when compiling the Function graph.", variable.AsString().c_str(), variable.Shape().AsString().c_str());
+
+                auto dynamicAxes = variable.DynamicAxes();
+
+                if (!dynamicAxes.empty() && (dynamicAxes.back() != Axis::DefaultBatchAxis()))
+                    CNTK::LogicError("Random Variable '%ls' does not have the DefaultBatchAxis as its last dynamic axis.", variable.AsString().c_str());
+
+                // TODO: Support inputs with > 1 dynamic axes
+                if (dynamicAxes.size() > 2)
+                    CNTK::LogicError("Random Variable '%ls' has %zd dynamic axes; currently only <= 2 dynamic axes are supported.",
+                        variable.AsString().c_str(), dynamicAxes.size());
+
+                computationNodePtr = builder.CreateInputNode(internalNodeName, AsTensorShape(variable.Shape()), internalDynamicAxisName);
+            }
+            else 
+            {
+                auto outputVariableNode = GetOutputVariableNode(variable, network, builder, fullyDefinedArgumentsMap, variableToNodeMap, isVariableRootMap, inputsToExcludeGradientsFor, useMangledNamesForComputationNodes);
+                // Can be null in case of loops with f.output == f.input.
+                // Such loops cannot be handled, so we leave nullptr as computational node.
+                if (outputVariableNode)
+                    computationNodePtr = outputVariableNode->template As<ComputationNode<ElementType>>()->shared_from_this();
+                else
+                    computationNodePtr = nullptr;
+            }
         }
 
         variableToNodeMap[variable] = computationNodePtr;

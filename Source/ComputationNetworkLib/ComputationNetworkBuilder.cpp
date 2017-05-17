@@ -250,6 +250,12 @@ shared_ptr<ComputationNode<ElemType>> ComputationNetworkBuilder<ElemType>::Creat
 }
 
 template <class ElemType>
+shared_ptr<ComputationNode<ElemType>> ComputationNetworkBuilder<ElemType>::CreateRandomUniformNode(const std::wstring& inputName, const TensorShape& sampleLayout, const wstring& dynamicAxisName)
+{
+    return net.AddNodeToNetWithElemType(New<RandomUniform<ElemType>>(net.GetDeviceId(), inputName, sampleLayout, dynamicAxisName));
+}
+
+template <class ElemType>
 shared_ptr<ComputationNode<ElemType>> ComputationNetworkBuilder<ElemType>::CreateConvolutionNode(const std::wstring& nodeName,
                                                                                                  const size_t kernelWidth, const size_t kernelHeight, const size_t outputChannels,
                                                                                                  const size_t horizontalSubsample, const size_t verticalSubsample,
