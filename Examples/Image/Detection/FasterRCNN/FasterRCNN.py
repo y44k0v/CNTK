@@ -73,7 +73,7 @@ image_height = 1000
 image_width = 1000
 mb_size = 1
 max_epochs = cfg["CNTK"].MAX_EPOCHS_E2E
-im_info = [image_width, image_height, 1]
+im_info = cntk.constant([image_width, image_height, 1], (3,))
 
 # dataset specific parameters
 dataset = cfg["CNTK"].DATASET
@@ -115,6 +115,7 @@ if base_model_to_use == "AlexNet":
     pool_node_name = "pool3"
     last_hidden_node_name = "h2_d"
     roi_dim = 6
+    proposal_layer_params = "'feat_stride': 16\n'scales':\n - 8 \n - 16 \n - 32"
 elif base_model_to_use == "VGG16":
     base_model_file = os.path.join(model_folder, "VGG16_ImageNet.cntkmodel")
     feature_node_name = "data"
@@ -123,6 +124,7 @@ elif base_model_to_use == "VGG16":
     pool_node_name = "pool5"
     last_hidden_node_name = "drop7"
     roi_dim = 7
+    proposal_layer_params = "'feat_stride': 16\n'scales':\n - 8 \n - 16 \n - 32"
 else:
     raise ValueError('unknown base model: %s' % base_model_to_use)
 ###############################################################
@@ -301,9 +303,10 @@ def faster_rcnn_predictor(features, scaled_gt_boxes):
     conv_out = conv_layers(feat_norm)
 
     # RPN
-    rpn_rois, rpn_losses = create_rpn(conv_out, scaled_gt_boxes, im_info, cfg)
+    rpn_rois, rpn_losses = create_rpn(conv_out, scaled_gt_boxes, im_info, cfg,
+                                      proposal_layer_param_string=proposal_layer_params)
     rois, label_targets, bbox_targets, bbox_inside_weights = \
-        create_proposal_target_layer(rpn_rois, scaled_gt_boxes, num_classes=num_classes, im_info=im_info, cfg=cfg)
+        create_proposal_target_layer(rpn_rois, scaled_gt_boxes, num_classes=num_classes, cfg=cfg)
 
     # Fast RCNN
     cls_score, bbox_pred = create_fast_rcnn_predictor(conv_out, rois, fc_layers)
@@ -508,7 +511,8 @@ def train_faster_rcnn_alternating(debug_output=False):
         #conv_out = conv_layers(image_input)
 
         # RPN
-        rpn_rois, rpn_losses = create_rpn(conv_out, scaled_gt_boxes, im_info, cfg)
+        rpn_rois, rpn_losses = create_rpn(conv_out, scaled_gt_boxes, im_info, cfg,
+                                          proposal_layer_param_string=proposal_layer_params)
 
         stage1_rpn_network = combine([rpn_rois, rpn_losses])
         if debug_output: plot(stage1_rpn_network, os.path.join(globalvars['output_path'], "graph_frcn_train_stage1a_rpn." + graph_type))
@@ -554,7 +558,7 @@ def train_faster_rcnn_alternating(debug_output=False):
         rpn_losses = rpn_net.outputs[1] # required for training rpn in stage 2
 
         rois, label_targets, bbox_targets, bbox_inside_weights = \
-            create_proposal_target_layer(rpn_rois, scaled_gt_boxes, num_classes=num_classes, im_info=im_info, cfg=cfg)
+            create_proposal_target_layer(rpn_rois, scaled_gt_boxes, num_classes=num_classes, cfg=cfg)
 
         # Fast RCNN
         fc_layers = clone_model(base_model, [pool_node_name], [last_hidden_node_name], CloneMethod.clone)

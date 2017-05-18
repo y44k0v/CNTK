@@ -23,14 +23,16 @@ class AnchorTargetLayer(UserFunction):
     labels and bounding-box regression targets.
     """
 
-    def __init__(self, arg1, arg2, name='AnchorTargetLayer', im_info=None, cfg=None, deterministic=False):
-        super(AnchorTargetLayer, self).__init__([arg1, arg2], name=name)
-        #layer_params = yaml.load(self.param_str_)
-        anchor_scales = (8, 16, 32) #layer_params.get('scales', (8, 16, 32))
+    def __init__(self, arg1, arg2, arg3, name='AnchorTargetLayer', param_str=None, cfg=None, deterministic=False):
+        super(AnchorTargetLayer, self).__init__([arg1, arg2, arg3], name=name)
+        self.param_str_ = param_str if param_str is not None else "'feat_stride': 16\n'scales':\n - 8 \n - 16 \n - 32"
+
+        # parse the layer parameter string, which must be valid YAML
+        layer_params = yaml.load(self.param_str_)
+        anchor_scales = layer_params.get('scales', (8, 16, 32))
         self._anchors = generate_anchors(scales=np.array(anchor_scales))
         self._num_anchors = self._anchors.shape[0]
-        self._feat_stride = 16 #layer_params['feat_stride']
-        self._im_info = im_info
+        self._feat_stride = layer_params['feat_stride']
         self._cfg = cfg
         self._determininistic_mode = deterministic
 
@@ -92,11 +94,11 @@ class AnchorTargetLayer(UserFunction):
         bottom = arguments
 
         # map of shape (..., H, W)
-        height, width = bottom[0].data.shape[-2:]
+        height, width = bottom[0].shape[-2:]
         # GT boxes (x1, y1, x2, y2, label)
         gt_boxes = bottom[1][0,:]
         # im_info
-        im_info = self._im_info
+        im_info = bottom[2]
 
         # remove zero padded ground truth boxes
         keep = np.where(
@@ -252,19 +254,18 @@ class AnchorTargetLayer(UserFunction):
         pass
 
     def clone(self, cloned_inputs):
-        return AnchorTargetLayer(cloned_inputs[0], cloned_inputs[1],
-                                 im_info=self._im_info, cfg=self._cfg)
+        return AnchorTargetLayer(cloned_inputs[0], cloned_inputs[1], cloned_inputs[2], cfg=self._cfg, param_str=self.param_str_)
 
     def serialize(self):
         internal_state = {}
-        internal_state['im_info'] = self._im_info
+        internal_state['param_str'] = self.param_str_
         # TODO: store cfg values in state
         return internal_state
 
     @staticmethod
     def deserialize(inputs, name, state):
-        im_info = state['im_info']
-        return AnchorTargetLayer(inputs[0], inputs[1], name=name, im_info=im_info)
+        param_str = state['param_str']
+        return AnchorTargetLayer(inputs[0], inputs[1], inputs[2], name=name, param_str=param_str)
 
 
 def _unmap(data, count, inds, fill=0):

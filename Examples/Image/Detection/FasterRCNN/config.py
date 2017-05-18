@@ -35,7 +35,7 @@ cfg = __C
 __C.CNTK = edict()
 
 __C.CNTK.TRAIN_E2E = False
-__C.CNTK.MAKE_MODE = True
+__C.CNTK.MAKE_MODE = False
 __C.CNTK.DEBUG_OUTPUT = True
 
 __C.CNTK.DATASET = "Grocery" # "Grocery" or "Pascal"
