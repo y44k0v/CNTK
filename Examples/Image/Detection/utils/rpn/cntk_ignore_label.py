@@ -43,7 +43,9 @@ class IgnoreLabel(UserFunction):
         outputs[self.outputs[0]] = clean_pred
         outputs[self.outputs[1]] = targets
 
-        return ignore_ind
+        # since we set target = pred the gradients for ignored entries should already be zero.
+        # hence, no state is required
+        return None
 
     def backward(self, state, root_gradients, variables):
         # gradients for prediction: propagate only for those that were not ignored

@@ -6,8 +6,6 @@ from cntk import output_variable
 from cntk.ops.functions import UserFunction
 import numpy as np
 
-DEBUG = False
-
 class SmoothL1Loss(UserFunction):
     """
     Computes a smooth L1 loss

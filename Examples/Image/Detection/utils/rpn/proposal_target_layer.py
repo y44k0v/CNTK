@@ -21,12 +21,13 @@ class ProposalTargetLayer(UserFunction):
     classification labels and bounding-box regression targets.
     """
     
-    def __init__(self, arg1, arg2, name='ProposalTargetLayer', num_classes=2, im_info=None, cfg=None, deterministic=False):
+    def __init__(self, arg1, arg2, name='ProposalTargetLayer', param_str=None, cfg=None, deterministic=False):
         super(ProposalTargetLayer, self).__init__([arg1, arg2], name=name)
+        self.param_str_ = param_str if param_str is not None else "'num_classes': 2"
 
-        # layer_params = yaml.load(self.param_str_)
-        self._num_classes = num_classes # layer_params['num_classes']
-        self._im_info = im_info
+        # parse the layer parameter string, which must be valid YAML
+        layer_params = yaml.load(self.param_str_)
+        self._num_classes = layer_params['num_classes']
         self._cfg = cfg
         self._determininistic_mode = deterministic
 
@@ -162,19 +163,18 @@ class ProposalTargetLayer(UserFunction):
         pass
 
     def clone(self, cloned_inputs):
-        return ProposalTargetLayer(cloned_inputs[0], cloned_inputs[1],
-                                   num_classes=self._num_classes, im_info=self._im_info, cfg=self._cfg)
+        return ProposalTargetLayer(cloned_inputs[0], cloned_inputs[1], cfg=self._cfg, param_str=self.param_str_)
 
     def serialize(self):
         internal_state = {}
-        internal_state['num_classes'] = self._num_classes
+        internal_state['param_str'] = self.param_str_
         # TODO: store cfg values in state
         return internal_state
 
     @staticmethod
     def deserialize(inputs, name, state):
-        num_classes = state['num_classes']
-        return ProposalTargetLayer(inputs[0], inputs[1], name=name, num_classes=num_classes)
+        param_str = state['param_str']
+        return ProposalTargetLayer(inputs[0], inputs[1], name=name, param_str=param_str)
 
 
 def _get_bbox_regression_labels(bbox_target_data, num_classes):

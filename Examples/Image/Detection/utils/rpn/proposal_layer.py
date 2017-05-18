@@ -8,6 +8,7 @@
 from cntk import output_variable
 from cntk.ops.functions import UserFunction
 import numpy as np
+import yaml
 from utils.rpn.generate_anchors import generate_anchors
 from utils.fast_rcnn.bbox_transform import bbox_transform_inv, clip_boxes
 from utils.fast_rcnn.nms_wrapper import nms
@@ -20,16 +21,17 @@ class ProposalLayer(UserFunction):
     transformations to a set of regular boxes (called "anchors").
     """
 
-    def __init__(self, arg1, arg2, name='ProposalLayer', im_info=None, cfg=None):
-        super(ProposalLayer, self).__init__([arg1, arg2], name=name)
-        # parse the layer parameter string, which must be valid YAML
-        # layer_params = yaml.load(self.param_str_)
+    def __init__(self, arg1, arg2, arg3, name='ProposalLayer', param_str=None, cfg=None):
+        super(ProposalLayer, self).__init__([arg1, arg2, arg3], name=name)
+        self.param_str_ = param_str if param_str is not None else "'feat_stride': 16\n'scales':\n - 8 \n - 16 \n - 32"
+        self._cfg = cfg
 
-        self._feat_stride = 16 # layer_params['feat_stride']
-        anchor_scales = (8, 16, 32) # layer_params.get('scales', (8, 16, 32))
+        # parse the layer parameter string, which must be valid YAML
+        layer_params = yaml.load(self.param_str_)
+        self._feat_stride = layer_params['feat_stride']
+        anchor_scales = layer_params.get('scales', (8, 16, 32))
         self._anchors = generate_anchors(scales=np.array(anchor_scales))
         self._num_anchors = self._anchors.shape[0]
-        self._im_info = im_info
 
         self._TRAIN_RPN_PRE_NMS_TOP_N = 12000 if cfg is None else cfg["TRAIN"].RPN_PRE_NMS_TOP_N
         self._TRAIN_RPN_POST_NMS_TOP_N = 2000 if cfg is None else cfg["TRAIN"].RPN_POST_NMS_TOP_N
@@ -72,7 +74,7 @@ class ProposalLayer(UserFunction):
         # return the top proposals (-> RoIs top, scores top)
 
         bottom = arguments
-        assert bottom[0].data.shape[0] == 1, \
+        assert bottom[0].shape[0] == 1, \
             'Only single item batches are supported'
 
         # TODO: cfg_key = str(self.phase) # either 'TRAIN' or 'TEST'
@@ -83,10 +85,9 @@ class ProposalLayer(UserFunction):
 
         # the first set of _num_anchors channels are bg probs
         # the second set are the fg probs, which we want
-        # scores = bottom[0][:, self._num_anchors:, :, :]
-        scores = bottom[0][:,1,:, :, :]
+        scores = bottom[0][:, self._num_anchors:, :, :]
         bbox_deltas = bottom[1]
-        im_info = self._im_info
+        im_info = bottom[2]
 
         if DEBUG:
             print ('im_size: ({}, {})'.format(im_info[0], im_info[1]))
@@ -184,17 +185,18 @@ class ProposalLayer(UserFunction):
         pass
 
     def clone(self, cloned_inputs):
-        return ProposalLayer(cloned_inputs[0], cloned_inputs[1], im_info=self._im_info)
+        return ProposalLayer(cloned_inputs[0], cloned_inputs[1], cloned_inputs[2], cfg=self._cfg, param_str=self.param_str_)
 
     def serialize(self):
         internal_state = {}
-        internal_state['im_info'] = self._im_info
+        internal_state['param_str'] = self.param_str_
+        # TODO: store cfg values in state
         return internal_state
 
     @staticmethod
     def deserialize(inputs, name, state):
-        im_info = state['im_info']
-        return ProposalLayer(inputs[0], inputs[1], name=name, im_info=im_info)
+        param_str = state['param_str']
+        return ProposalLayer(inputs[0], inputs[1], inputs[2], name=name, param_str=param_str)
 
 
 def _filter_boxes(boxes, min_size):
