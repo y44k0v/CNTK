@@ -101,6 +101,7 @@ namespace CNTK
         {PrimitiveOpType::Assign, L"Assign" },
         {PrimitiveOpType::Gather, L"Gather"},
         {PrimitiveOpType::StableSigmoid, L"StableSigmoid"},
+        {PrimitiveOpType::RandomUniform, L"RandomUniform" },
     };
 
     inline const std::wstring& PrimitiveOpTypeName(PrimitiveOpType opType)
@@ -232,6 +233,7 @@ namespace CNTK
         static const std::wstring AttributeNameBlendTimeConstant;
         static const std::wstring AttributeNameEpsilon;
         static const std::wstring AttributeNameUseCuDNNEngine;
+        static const std::wstring AttributeNameNewDataType;
         static const std::wstring AttributeNameNewDynamicAxes;
         static const std::wstring AttributeNameNewSequenceAxisLengthScalingFactor;
         static const std::wstring AttributeNameNewSequenceAxisLengthAdditiveFactor;

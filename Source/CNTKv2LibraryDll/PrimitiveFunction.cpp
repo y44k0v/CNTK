@@ -71,6 +71,7 @@ namespace CNTK
     /*static*/ const std::wstring PrimitiveFunction::AttributeNameBlendTimeConstant = L"blendTimeConstant";
     /*static*/ const std::wstring PrimitiveFunction::AttributeNameEpsilon = L"epsilon";
     /*static*/ const std::wstring PrimitiveFunction::AttributeNameUseCuDNNEngine = L"useCuDNNEngine";
+    /*static*/ const std::wstring PrimitiveFunction::AttributeNameNewDataType = L"newDataType";
     /*static*/ const std::wstring PrimitiveFunction::AttributeNameNewDynamicAxes = L"newDynamicAxes";
     /*static*/ const std::wstring PrimitiveFunction::AttributeNameNewSequenceAxisLengthScalingFactor = L"newSequenceAxisLengthScalingFactor";
     /*static*/ const std::wstring PrimitiveFunction::AttributeNameNewSequenceAxisLengthAdditiveFactor = L"newSequenceAxisLengthAdditiveFactor";
@@ -336,6 +337,13 @@ namespace CNTK
                             if (outputShape.HasFreeDimension())
                                 InvalidArgument("RandomUniform: Output shape '%ls' must not have a free dimension.", outputShape.AsString().c_str());
                             outputDynamicAxes = AsVector<Axis>(m_attributes[PrimitiveFunction::AttributeNameNewDynamicAxes].Value<std::vector<DictionaryValue>>());
+                            int datatypecode = m_attributes[PrimitiveFunction::AttributeNameNewDataType].Value<int>();
+                            if (datatypecode == static_cast<int>(DataType::Float))
+                                outputDataType = DataType::Float;
+                            else if (datatypecode == static_cast<int>(DataType::Double))
+                                outputDataType = DataType::Double;
+                            else
+                                InvalidArgument("RandomUniform: data type must be one of float, double.");
                             break;
                         }
                         case PrimitiveOpType::Negate:

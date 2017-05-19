@@ -1178,6 +1178,7 @@ namespace CNTK
 
         additionalProperties[PrimitiveFunction::AttributeNameNewShape] = shape;
         additionalProperties[PrimitiveFunction::AttributeNameNewDynamicAxes] = AsDictionaryValueVector(dynamicAxes);
+        additionalProperties[PrimitiveFunction::AttributeNameNewDataType] = static_cast<int>(dataType);
         if (seed == SentinelValueForAutoSelectRandomSeed)
             seed = Internal::GenerateRandomSeed(true);
 
