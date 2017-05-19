@@ -230,29 +230,19 @@ def parse_arguments():
 ###############################################################
 ###############################################################
 
-# Instantiates a composite minibatch source for reading images, roi coordinates and roi labels for training Fast R-CNN
+# Instantiates a composite minibatch source for reading images, roi coordinates and roi labels for training Faster R-CNN
 def create_mb_source(img_map_file, roi_map_file, img_height, img_width, img_channels, n_rois, randomize=True):
-    rois_dim = 5 * n_rois
-
     if not os.path.exists(img_map_file) or not os.path.exists(roi_map_file):
-        raise RuntimeError("File '%s' or '%s' does not exist. "
-                           "Please run install_fastrcnn.py from Examples/Image/Detection/FastRCNN to fetch them" %
-                           (img_map_file, roi_map_file))
+        raise RuntimeError("File '%s' or '%s' does not exist. Please run install_fastrcnn.py from "
+                           "Examples/Image/Detection/FastRCNN to fetch them" % (img_map_file, roi_map_file))
 
-    # read images
-    transforms = [scale(width=img_width, height=img_height, channels=img_channels,
-                        scale_mode="pad", pad_value=114, interpolations='linear')]
+    # read images, rois and labels
+    transforms = [scale(width=img_width, height=img_height, channels=img_channels, scale_mode="pad", pad_value=114, interpolations='linear')]
+    image_source = ImageDeserializer(img_map_file, StreamDefs(features = StreamDef(field='image', transforms=transforms)))
+    rois_dim = 5 * n_rois
+    roi_source = CTFDeserializer(roi_map_file, StreamDefs(roiAndLabel = StreamDef(field=roi_stream_name, shape=rois_dim, is_sparse=False)))
 
-    image_source = ImageDeserializer(img_map_file, StreamDefs(
-        features = StreamDef(field='image', transforms=transforms)))
-
-    # read rois and labels
-    roi_source = CTFDeserializer(roi_map_file, StreamDefs(
-        roiAndLabel = StreamDef(field=roi_stream_name, shape=rois_dim, is_sparse=False)))
-
-    # define a composite reader
-    return MinibatchSource([image_source, roi_source], epoch_size=sys.maxsize,
-                           randomize=randomize, trace_level=reader_trace_level)
+    return MinibatchSource([image_source, roi_source], epoch_size=sys.maxsize, randomize=randomize, trace_level=reader_trace_level)
 
 def clone_model(base_model, from_node_names, to_node_names, clone_method):
     from_nodes = [find_by_name(base_model, node_name) for node_name in from_node_names]
