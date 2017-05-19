@@ -492,7 +492,7 @@ namespace CNTK
                 };
 
                 auto deserializerTypeName = deserializerConfig[L"type"].Value<std::wstring>();
-                if (deserializerTypeName == L"ImageDeserializer")
+                if (deserializerTypeName == L"ImageDeserializer" || deserializerTypeName == L"Base64ImageDeserializer")
                 {
                     // Add a transpose transform since the image data in read in HWC (CWH in column major format) form while 
                     // the CNTK convolution engive supports WHC (in column-major format)
