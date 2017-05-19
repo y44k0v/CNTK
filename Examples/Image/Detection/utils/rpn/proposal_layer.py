@@ -190,13 +190,37 @@ class ProposalLayer(UserFunction):
     def serialize(self):
         internal_state = {}
         internal_state['param_str'] = self.param_str_
-        # TODO: store cfg values in state
+
+        # store cfg values in state
+        internal_state['TRAIN_RPN_PRE_NMS_TOP_N'] = self._TRAIN_RPN_PRE_NMS_TOP_N
+        internal_state['TRAIN_RPN_POST_NMS_TOP_N'] = self._TRAIN_RPN_POST_NMS_TOP_N
+        internal_state['TRAIN_RPN_NMS_THRESH'] = self._TRAIN_RPN_NMS_THRESH
+        internal_state['TRAIN_RPN_MIN_SIZE'] = self._TRAIN_RPN_MIN_SIZE
+
+        internal_state['TEST_RPN_PRE_NMS_TOP_N'] = self._TEST_RPN_PRE_NMS_TOP_N
+        internal_state['TEST_RPN_POST_NMS_TOP_N'] = self._TEST_RPN_POST_NMS_TOP_N
+        internal_state['TEST_RPN_NMS_THRESH'] = self._TEST_RPN_NMS_THRESH
+        internal_state['TEST_RPN_MIN_SIZE'] = self._TEST_RPN_MIN_SIZE
+
         return internal_state
 
     @staticmethod
     def deserialize(inputs, name, state):
         param_str = state['param_str']
-        return ProposalLayer(inputs[0], inputs[1], inputs[2], name=name, param_str=param_str)
+
+        from easydict import EasyDict as edict
+        __C = edict()
+        __C.TRAIN.RPN_PRE_NMS_TOP_N = state['TRAIN_RPN_PRE_NMS_TOP_N']
+        __C.TRAIN.RPN_POST_NMS_TOP_N = state['TRAIN_RPN_POST_NMS_TOP_N']
+        __C.TRAIN.RPN_NMS_THRESH = state['TRAIN_RPN_NMS_THRESH']
+        __C.TRAIN.RPN_MIN_SIZE = state['TRAIN_RPN_MIN_SIZE']
+
+        __C.TEST.RPN_PRE_NMS_TOP_N = state['TEST_RPN_PRE_NMS_TOP_N']
+        __C.TEST.RPN_POST_NMS_TOP_N = state['TEST_RPN_POST_NMS_TOP_N']
+        __C.TEST.RPN_NMS_THRESH = state['TEST_RPN_NMS_THRESH']
+        __C.TESTRPN_MIN_SIZE = state['TEST_RPN_MIN_SIZE']
+
+        return ProposalLayer(inputs[0], inputs[1], inputs[2], name=name, cfg=__C, param_str=param_str)
 
 
 def _filter_boxes(boxes, min_size):

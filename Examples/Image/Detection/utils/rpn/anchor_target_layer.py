@@ -259,13 +259,29 @@ class AnchorTargetLayer(UserFunction):
     def serialize(self):
         internal_state = {}
         internal_state['param_str'] = self.param_str_
-        # TODO: store cfg values in state
+
+        # store cfg values in state
+        internal_state['TRAIN_RPN_CLOBBER_POSITIVES'] = self._TRAIN_RPN_CLOBBER_POSITIVES
+        internal_state['TRAIN_RPN_POSITIVE_OVERLAP'] = self._TRAIN_RPN_POSITIVE_OVERLAP
+        internal_state['TRAIN_RPN_NEGATIVE_OVERLAP'] = self._TRAIN_RPN_NEGATIVE_OVERLAP
+        internal_state['TRAIN_RPN_FG_FRACTION'] = self._TRAIN_RPN_FG_FRACTION
+        internal_state['TRAIN_RPN_BATCHSIZE'] = self._TRAIN_RPN_BATCHSIZE
+
         return internal_state
 
     @staticmethod
     def deserialize(inputs, name, state):
         param_str = state['param_str']
-        return AnchorTargetLayer(inputs[0], inputs[1], inputs[2], name=name, param_str=param_str)
+
+        from easydict import EasyDict as edict
+        __C = edict()
+        __C.TRAIN.RPN_CLOBBER_POSITIVES = state['TRAIN_RPN_CLOBBER_POSITIVES']
+        __C.TRAIN.RPN_POSITIVE_OVERLAP = state['TRAIN_RPN_POSITIVE_OVERLAP']
+        __C.TRAIN.RPN_NEGATIVE_OVERLAP = state['TRAIN_RPN_NEGATIVE_OVERLAP']
+        __C.TRAIN.RPN_FG_FRACTION = state['TRAIN_RPN_FG_FRACTION']
+        __C.TRAIN.RPN_BATCHSIZE = state['TRAIN_RPN_BATCHSIZE']
+
+        return AnchorTargetLayer(inputs[0], inputs[1], inputs[2], name=name, cfg=__C, param_str=param_str)
 
 
 def _unmap(data, count, inds, fill=0):

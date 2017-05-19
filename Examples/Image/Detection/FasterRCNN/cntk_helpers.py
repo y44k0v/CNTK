@@ -261,22 +261,6 @@ def imconvertCv2Pil(img):
 def ToIntegers(list1D):
     return [int(float(x)) for x in list1D]
 
-def softmax(vec):
-    expVec = np.exp(vec)
-    # TODO: check numerical stability
-    if max(expVec) == np.inf:
-        outVec = np.zeros(len(expVec))
-        outVec[expVec == np.inf] = vec[expVec == np.inf]
-        outVec = outVec / np.sum(outVec)
-    else:
-        outVec = expVec / np.sum(expVec)
-    return outVec
-
-def softmax2D(w):
-    e = np.exp(w)
-    dist = e / np.sum(e, axis=1)[:, np.newaxis]
-    return dist
-
 def getDictionary(keys, values, boConvertValueToInt = True):
     dictionary = {}
     for key,value in zip(keys, values):

@@ -168,13 +168,29 @@ class ProposalTargetLayer(UserFunction):
     def serialize(self):
         internal_state = {}
         internal_state['param_str'] = self.param_str_
-        # TODO: store cfg values in state
+
+        # store cfg values in state
+        internal_state['TRAIN_RPN_POST_NMS_TOP_N'] = self._TRAIN_RPN_POST_NMS_TOP_N
+        internal_state['TRAIN_FG_FRACTION'] = self._TRAIN_FG_FRACTION
+        internal_state['TRAIN_FG_THRESH'] = self._TRAIN_FG_THRESH
+        internal_state['TRAIN_BG_THRESH_HI'] = self._TRAIN_BG_THRESH_HI
+        internal_state['TRAIN_BG_THRESH_LO'] = self._TRAIN_BG_THRESH_LO
+
         return internal_state
 
     @staticmethod
     def deserialize(inputs, name, state):
         param_str = state['param_str']
-        return ProposalTargetLayer(inputs[0], inputs[1], name=name, param_str=param_str)
+
+        from easydict import EasyDict as edict
+        __C = edict()
+        __C.TRAIN.RPN_POST_NMS_TOP_N = state['TRAIN_RPN_POST_NMS_TOP_N']
+        __C.TRAIN.FG_FRACTION = state['TRAIN_FG_FRACTION']
+        __C.TRAIN.FG_THRESH = state['TRAIN_FG_THRESH']
+        __C.TRAIN.BG_THRESH_HI = state['TRAIN_BG_THRESH_HI']
+        __C.TRAIN.BG_THRESH_LO = state['TRAIN_BG_THRESH_LO']
+
+        return ProposalTargetLayer(inputs[0], inputs[1], name=name, cfg=__C, param_str=param_str)
 
 
 def _get_bbox_regression_labels(bbox_target_data, num_classes):

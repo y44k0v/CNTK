@@ -809,6 +809,7 @@ if __name__ == '__main__':
         print("Stored eval model at %s" % model_path)
 
     # Evaluate the test set
-    #eval_faster_rcnn_mAP(eval_model, globalvars['test_map_file'], globalvars['test_roi_file'])
     if DEBUG_OUTPUT:
         eval_faster_rcnn_plot(eval_model, num_images_to_plot=500, debug_output=True)
+
+    eval_faster_rcnn_mAP(eval_model, globalvars['test_map_file'], globalvars['test_roi_file'])
