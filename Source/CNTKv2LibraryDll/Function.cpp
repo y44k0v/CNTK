@@ -987,6 +987,12 @@ namespace CNTK
         }
     }
 
+    FunctionPtr NullaryOp(PrimitiveOpType op, Dictionary&& opConfig, const std::wstring& name)
+    {
+        std::vector<Variable> operands{};
+        return AsComposite(MakeSharedObject<PrimitiveFunction>(op, operands, std::move(opConfig), name), name);
+    }
+
     FunctionPtr UnaryOp(PrimitiveOpType op, const Variable& operand, Dictionary&& opConfig, const std::wstring& name)
     {
         std::vector<Variable> operands = { operand };
@@ -1164,6 +1170,21 @@ namespace CNTK
         additionalProperties[PrimitiveFunction::AttributeNameRngOffset] = size_t(0);
 
         return UnaryOp(PrimitiveOpType::Dropout, operand, std::move(additionalProperties), name);
+    }
+
+    FunctionPtr RandomVariable(const NDShape& shape, DataType dataType, const std::vector<Axis>& dynamicAxes, double low, double high, unsigned long seed, const std::wstring& name)
+    {
+        auto additionalProperties = Dictionary();
+
+        additionalProperties[PrimitiveFunction::AttributeNameNewShape] = shape;
+        additionalProperties[PrimitiveFunction::AttributeNameNewDynamicAxes] = AsDictionaryValueVector(dynamicAxes);
+        if (seed == SentinelValueForAutoSelectRandomSeed)
+            seed = Internal::GenerateRandomSeed(true);
+
+        additionalProperties[PrimitiveFunction::AttributeNameRngSeed] = size_t(seed);
+        additionalProperties[PrimitiveFunction::AttributeNameRngOffset] = size_t(0);
+
+        return NullaryOp(PrimitiveOpType::RandomUniform, std::move(additionalProperties), name);
     }
 
     FunctionPtr Reshape(const Variable& operand, const NDShape& replacementShape, const Axis& beginAxis, const Axis& endAxis, const std::wstring& name)

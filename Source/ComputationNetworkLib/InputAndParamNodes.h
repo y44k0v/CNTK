@@ -477,17 +477,17 @@ template class SparseInputValue<double>;
 // -----------------------------------------------------------------------
 
 template <class ElemType>
-class RandomUniform : public InputValueBase<ElemType>, public IdentityTransformerNode, public RngUser
+class RandomUniformNode : public InputValueBase<ElemType>, public IdentityTransformerNode, public RngUser
 {
     typedef InputValueBase<ElemType> Base; UsingComputationNodeMembersBoilerplate;
     static const std::wstring TypeName() { return L"RandomUniform"; }
 
 public:
-    RandomUniform(DEVICEID_TYPE deviceId, const wstring& name)
+    RandomUniformNode(DEVICEID_TYPE deviceId, const wstring& name)
         : Base(deviceId, name, false, L"")
     {
     }
-    RandomUniform(DEVICEID_TYPE deviceId, const wstring& name, const TensorShape& sampleLayout, const wstring& dynamicAxisName)
+    RandomUniformNode(DEVICEID_TYPE deviceId, const wstring& name, const TensorShape& sampleLayout, const wstring& dynamicAxisName)
         : Base(deviceId, name, sampleLayout, false, dynamicAxisName)
     {
     }

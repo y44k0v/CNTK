@@ -2841,6 +2841,20 @@ def placeholder_variable(shape=None, dynamic_axes=None, name=''):
     return placeholder(shape, dynamic_axes, name)
 
 @typemap
+def random_variable(shape, dtype=default_override_or(np.float32), dynamic_axes=[Axis.default_batch_axis()], name=''):
+    from cntk.cntk_py import random_variable
+    from cntk.internal import sanitize_shape, sanitize_dtype_cntk
+
+    shape = sanitize_shape(shape)
+    dtype = get_default_override(_input_spec, dtype=dtype)
+    if dtype is None:
+        dtype = np.float32
+    dtype = sanitize_dtype_cntk(dtype)
+    dynamic_axes = sanitize_dynamic_axes(dynamic_axes)
+
+    return random_variable(shape, dtype, dynamic_axes, 0.0, 1.0, 98052, "foo")
+
+@typemap
 def parameter(shape=None, init=None, dtype=None, device=None, name=''):
     '''
     It creates a parameter tensor.

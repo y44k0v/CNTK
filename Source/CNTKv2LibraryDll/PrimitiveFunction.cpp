@@ -164,6 +164,12 @@ namespace CNTK
 
         // We currently require that the inputs' dynamic axes, if any, match
         std::vector<Axis> outputDynamicAxes;
+        if (op == PrimitiveOpType::RandomUniform)
+        {
+            // ...but we make an exception for random variables
+            // where we return something dummy that must be cleaned up by the caller
+            return Axis::UnknownDynamicAxes();
+        }
         if ((op == PrimitiveOpType::SumAll) ||
             (op == PrimitiveOpType::ReduceElements && functionConfig[PrimitiveFunction::AttributeNameAxis].Value<Axis>() == Axis::AllAxes()) ||
             (op == PrimitiveOpType::SquaredError) ||
@@ -323,6 +329,15 @@ namespace CNTK
                     {
                         switch (m_op)
                         {
+                        case PrimitiveOpType::RandomUniform:
+                        {
+                            assert(m_inputs.size() == 0);
+                            outputShape = m_attributes[PrimitiveFunction::AttributeNameNewShape].Value<NDShape>();
+                            if (outputShape.HasFreeDimension())
+                                InvalidArgument("RandomUniform: Output shape '%ls' must not have a free dimension.", outputShape.AsString().c_str());
+                            outputDynamicAxes = AsVector<Axis>(m_attributes[PrimitiveFunction::AttributeNameNewDynamicAxes].Value<std::vector<DictionaryValue>>());
+                            break;
+                        }
                         case PrimitiveOpType::Negate:
                         case PrimitiveOpType::Sigmoid:
                         case PrimitiveOpType::Tanh:
@@ -1260,9 +1275,7 @@ namespace CNTK
 
     void PrimitiveFunction::SetRandomSeed(size_t seed)
     {
-        if (!(OpType() == PrimitiveOpType::Dropout ||
-            OpType() == PrimitiveOpType::RandomSample ||
-            OpType() == PrimitiveOpType::RandomSampleInclusionFrequency))
+        if (!IsStateful())
             LogicError("Cannot set random seed on '%S' function.", OpName().c_str());
 
         m_attributes[AttributeNameRngSeed] = seed;

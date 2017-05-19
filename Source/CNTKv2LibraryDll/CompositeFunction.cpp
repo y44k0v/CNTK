@@ -23,6 +23,7 @@
 #include "BlockFunction.h"
 #include "SpecialPurposeNodes.h"
 #include "SequenceReshapeNodes.h"
+#include "InputAndParamNodes.h"
 #include "UserDefinedFunction.h"
 
 using namespace Microsoft::MSR::CNTK;
@@ -534,6 +535,13 @@ namespace CNTK
 
                 auto dynamicAxes = variable.DynamicAxes();
 
+                std::wstring internalDynamicAxisName = L"?";
+                if (!dynamicAxes.empty())
+                {
+                    // Construct the dynamic axis name to be used internally for the CNTK InputNodes
+                    internalDynamicAxisName = InternalDynamicAxisNameFromDynamicAxes(dynamicAxes);
+                }
+
                 if (!dynamicAxes.empty() && (dynamicAxes.back() != Axis::DefaultBatchAxis()))
                     CNTK::LogicError("Random Variable '%ls' does not have the DefaultBatchAxis as its last dynamic axis.", variable.AsString().c_str());
 
@@ -771,6 +779,13 @@ namespace CNTK
                     auto dropoutRate = functionConfig[PrimitiveFunction::AttributeNameDropoutRate].Value<double>();
                     computationNodePtr = New<DropoutNode<ElementType>>(network->GetDeviceId(), internalNodeName);
                     computationNodePtr->As<DropoutNode<ElementType>>()->SetDropoutRate(dropoutRate);
+                    break;
+                }
+                case PrimitiveOpType::RandomUniform:
+                {
+                    auto shape = functionConfig[PrimitiveFunction::AttributeNameNewShape].Value<NDShape>();
+                    auto dynamicAxes = AsVector<Axis>(functionConfig[PrimitiveFunction::AttributeNameNewDynamicAxes].Value<std::vector<DictionaryValue>>());
+                    computationNodePtr = New<RandomUniformNode<ElementType>>(network->GetDeviceId(), internalNodeName, AsTensorShape(shape), L"????");
                     break;
                 }
                 case PrimitiveOpType::Reshape:

@@ -306,7 +306,8 @@ namespace CNTK
         {
             return (OpType() == PrimitiveOpType::Dropout) ||
                    (OpType() == PrimitiveOpType::RandomSample) ||
-                   (OpType() == PrimitiveOpType::RandomSampleInclusionFrequency);
+                   (OpType() == PrimitiveOpType::RandomSampleInclusionFrequency) ||
+                   (OpType() == PrimitiveOpType::RandomUniform);
         }
 
         Dictionary GetState() const;
