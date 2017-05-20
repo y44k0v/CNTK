@@ -355,8 +355,10 @@ public:
     {
         // don't touch our values
         // But take the opportunity for an additional check. Why not.
+        /*
         if (Value().GetNumRows() != GetSampleLayout().GetNumElements())
             LogicError("UpdateFunctionMBSize: m_value not matching m_sampleLayout");
+        */
     }
 
     virtual void /*ComputationNode::*/ ForwardProp(const FrameRange&) override
@@ -494,6 +496,7 @@ public:
 
     virtual void /*ComputationNode::*/ ForwardProp(const FrameRange&) override;
     virtual void /*ComputationNode::*/ BackpropTo(const size_t /*inputIndex*/, const FrameRange&) override;
+    virtual bool /*ComputationNodeBase::*/ IsOutOfDateWrtInputs() const override;
 
     RNGHandle& GetRNGHandle()
     {

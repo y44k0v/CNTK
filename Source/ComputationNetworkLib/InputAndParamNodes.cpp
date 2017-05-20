@@ -668,6 +668,9 @@ template <class ElemType>
     LogicError("%ls %ls operation is a random variable and cannot BackpropTo() it.", NodeName().c_str(), OperationName().c_str());
 }
 
+template <class ElemType>
+/*virtual*/ bool RandomUniformNode<ElemType>::IsOutOfDateWrtInputs() const /*override*/ { return true; }
+
 template class RandomUniformNode<float>;
 template class RandomUniformNode<double>;
 

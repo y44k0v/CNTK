@@ -535,7 +535,7 @@ namespace CNTK
 
                 auto dynamicAxes = variable.DynamicAxes();
 
-                std::wstring internalDynamicAxisName = L"?";
+                std::wstring internalDynamicAxisName = L"";
                 if (!dynamicAxes.empty())
                 {
                     // Construct the dynamic axis name to be used internally for the CNTK InputNodes
@@ -550,7 +550,7 @@ namespace CNTK
                     CNTK::LogicError("Random Variable '%ls' has %zd dynamic axes; currently only <= 2 dynamic axes are supported.",
                         variable.AsString().c_str(), dynamicAxes.size());
 
-                computationNodePtr = builder.CreateInputNode(internalNodeName, AsTensorShape(variable.Shape()), internalDynamicAxisName);
+                computationNodePtr = builder.CreateRandomUniformNode(internalNodeName, AsTensorShape(variable.Shape()), internalDynamicAxisName);
             }
             else 
             {
@@ -783,9 +783,22 @@ namespace CNTK
                 }
                 case PrimitiveOpType::RandomUniform:
                 {
+                    //kapow
+                    auto seed = functionConfig[PrimitiveFunction::AttributeNameRngSeed].Value<size_t>();
+                    auto offset = functionConfig[PrimitiveFunction::AttributeNameRngOffset].Value<size_t>();
+
                     auto shape = functionConfig[PrimitiveFunction::AttributeNameNewShape].Value<NDShape>();
                     auto dynamicAxes = AsVector<Axis>(functionConfig[PrimitiveFunction::AttributeNameNewDynamicAxes].Value<std::vector<DictionaryValue>>());
-                    computationNodePtr = New<RandomUniformNode<ElementType>>(network->GetDeviceId(), internalNodeName, AsTensorShape(shape), L"????");
+
+                    std::wstring internalDynamicAxisName = L"";
+                    if (!dynamicAxes.empty())
+                    {
+                        // Construct the dynamic axis name to be used internally for the CNTK InputNodes
+                        internalDynamicAxisName = InternalDynamicAxisNameFromDynamicAxes(dynamicAxes);
+                    }
+
+                    computationNodePtr = New<RandomUniformNode<ElementType>>(network->GetDeviceId(), internalNodeName, AsTensorShape(shape), internalDynamicAxisName);
+                    computationNodePtr->As<RandomUniformNode<ElementType>>()->SetRngState(seed, offset);
                     break;
                 }
                 case PrimitiveOpType::Reshape:

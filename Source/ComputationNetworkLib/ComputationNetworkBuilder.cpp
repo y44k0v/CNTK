@@ -250,13 +250,12 @@ shared_ptr<ComputationNode<ElemType>> ComputationNetworkBuilder<ElemType>::Creat
     return net.AddNodeToNetWithElemType(New<SparseInputValue<ElemType>>(net.GetDeviceId(), inputName, imageLayout, dynamicAxisName));
 }
 
-/* kapow
 template <class ElemType>
 shared_ptr<ComputationNode<ElemType>> ComputationNetworkBuilder<ElemType>::CreateRandomUniformNode(const std::wstring& inputName, const TensorShape& sampleLayout, const wstring& dynamicAxisName)
 {
-    return net.AddNodeToNetWithElemType(New<RandomUniform<ElemType>>(net.GetDeviceId(), inputName, sampleLayout, dynamicAxisName));
+    return net.AddNodeToNetWithElemType(New<RandomUniformNode<ElemType>>(net.GetDeviceId(), inputName, sampleLayout, dynamicAxisName));
 }
-*/
+
 
 template <class ElemType>
 shared_ptr<ComputationNode<ElemType>> ComputationNetworkBuilder<ElemType>::CreateConvolutionNode(const std::wstring& nodeName,
