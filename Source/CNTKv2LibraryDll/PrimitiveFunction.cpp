@@ -101,6 +101,9 @@ namespace CNTK
     /*static*/ const std::wstring PrimitiveFunction::AttributeNameSequenceAxisNamePrefix = L"sequenceAxis";
     /*static*/ const std::wstring PrimitiveFunction::AttributeNameSequenceUnpackPaddingValue = L"sequenceUnpackPaddingValue";
     /*static*/ const std::wstring PrimitiveFunction::AttributeNameSequenceUnpackSuppressMaskOutput = L"sequenceUnpackSuppressMaskOutput";
+    /*static*/ const std::wstring PrimitiveFunction::AttributeNameRandomVariableType = L"randomVariableType";
+    /*static*/ const std::wstring PrimitiveFunction::AttributeNameRandomVariableArg0 = L"randomVariableArg0";
+    /*static*/ const std::wstring PrimitiveFunction::AttributeNameRandomVariableArg1 = L"randomVariableArg1";
 
     /*static*/ DataType PrimitiveFunction::GetOutputDataType(PrimitiveOpType op, std::vector<Variable>& inputs, bool inferDimensions)
     {
@@ -165,7 +168,7 @@ namespace CNTK
 
         // We currently require that the inputs' dynamic axes, if any, match
         std::vector<Axis> outputDynamicAxes;
-        if (op == PrimitiveOpType::RandomUniform)
+        if (op == PrimitiveOpType::RandomVariable)
         {
             // ...but we make an exception for random variables
             // where we return something dummy that must be cleaned up by the caller
@@ -330,12 +333,12 @@ namespace CNTK
                     {
                         switch (m_op)
                         {
-                        case PrimitiveOpType::RandomUniform:
+                        case PrimitiveOpType::RandomVariable:
                         {
                             assert(m_inputs.size() == 0);
                             outputShape = m_attributes[PrimitiveFunction::AttributeNameNewShape].Value<NDShape>();
                             if (outputShape.HasFreeDimension())
-                                InvalidArgument("RandomUniform: Output shape '%ls' must not have a free dimension.", outputShape.AsString().c_str());
+                                InvalidArgument("RandomVariable: Output shape '%ls' must not have a free dimension.", outputShape.AsString().c_str());
                             outputDynamicAxes = AsVector<Axis>(m_attributes[PrimitiveFunction::AttributeNameNewDynamicAxes].Value<std::vector<DictionaryValue>>());
                             int datatypecode = m_attributes[PrimitiveFunction::AttributeNameNewDataType].Value<int>();
                             if (datatypecode == static_cast<int>(DataType::Float))
@@ -343,7 +346,7 @@ namespace CNTK
                             else if (datatypecode == static_cast<int>(DataType::Double))
                                 outputDataType = DataType::Double;
                             else
-                                InvalidArgument("RandomUniform: data type must be one of float, double.");
+                                InvalidArgument("RandomVariable: data type must be one of float, double.");
                             break;
                         }
                         case PrimitiveOpType::Negate:
@@ -367,6 +370,7 @@ namespace CNTK
                         case PrimitiveOpType::StopGradient:
                         case PrimitiveOpType::ELU:
                         case PrimitiveOpType::StableSigmoid:
+                        case PrimitiveOpType::RandomVariableLike:
                             assert(m_inputs.size() == 1);
                             outputShape = UnaryElementwiseOpOutputShape(m_inputs[0].Shape());
                             break;

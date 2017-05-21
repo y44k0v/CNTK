@@ -474,24 +474,37 @@ template class SparseInputValue<double>;
 
 
 // -----------------------------------------------------------------------
-// RandomUniform (/*no input*/)
+// RandomVariableNode (/*no input*/)
 // a uniform random variable
 // -----------------------------------------------------------------------
 
 template <class ElemType>
-class RandomUniformNode : public InputValueBase<ElemType>, public IdentityTransformerNode, public RngUser
+class RandomVariableNode : public InputValueBase<ElemType>, public IdentityTransformerNode, public RngUser
 {
     typedef InputValueBase<ElemType> Base; UsingComputationNodeMembersBoilerplate;
-    static const std::wstring TypeName() { return L"RandomUniform"; }
+    static const std::wstring TypeName() { return L"RandomVariable"; }
 
 public:
-    RandomUniformNode(DEVICEID_TYPE deviceId, const wstring& name)
+    RandomVariableNode(DEVICEID_TYPE deviceId, const wstring& name)
         : Base(deviceId, name, false, L"")
     {
+        m_distribution = 1; //RandomVariableType::Uniform;
     }
-    RandomUniformNode(DEVICEID_TYPE deviceId, const wstring& name, const TensorShape& sampleLayout, const wstring& dynamicAxisName)
+
+    RandomVariableNode(DEVICEID_TYPE deviceId, const wstring& name, int distribution)
+        : Base(deviceId, name, false, L"")
+    {
+        if (distribution <= 1 /*RandomVariableType::Unknown*/ || distribution >= 5 /*RandomVariableType::Sentinel*/)
+            InvalidArgument("RandomVariableNode: Unknown distribution type %d", distribution);
+        m_distribution = distribution;
+    }
+
+    RandomVariableNode(DEVICEID_TYPE deviceId, const wstring& name, int distribution, const TensorShape& sampleLayout, const wstring& dynamicAxisName)
         : Base(deviceId, name, sampleLayout, false, dynamicAxisName)
     {
+        if (distribution <= 1 /*RandomVariableType::Unknown*/ || distribution >= 5 /*RandomVariableType::Sentinel*/)
+            InvalidArgument("RandomVariableNode: Unknown distribution type %d", distribution);
+        m_distribution = distribution;
     }
 
     virtual void /*ComputationNode::*/ ForwardProp(const FrameRange&) override;
@@ -502,6 +515,8 @@ public:
     {
         return RngUser::GetRNGHandle(ValuePtr()->GetDeviceId());
     }
+private:
+    int m_distribution;
 };
 
 

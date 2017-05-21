@@ -137,37 +137,6 @@ def bernoulli(shape, dtype=default_override_or(np.float32), dynamic_axes=(C.Axis
 
 
 @typemap
-def binomial(shape, dtype=default_override_or(np.float32), dynamic_axes=(C.Axis.default_batch_axis(),),
-             trials=1, success_prob=0.5, seed=auto_select, name= ''):
-    """binomial(shape, dtype=default_override_or(np.float32), dynamic_axes=(C.Axis.default_batch_axis(),), trials=1, success_prob=0.5, seed=auto_select, name= '')
-    Generates samples from the Binomial distribution with `trials` trials and success probability `success_prob`.
-
-    Args:
-        shape (tuple): shape of the output (entries are independent random draws)
-        dtype (np.float32 or np.float64): data type. Default is np.float32.
-        dynamic_axes (list or tuple): a list or tuple of dynamic axes (e.g., batch axis, time axis)
-        trials (int): number of trials
-        success_prob (float): success probability
-        seed (int): pseudo random number generator seed
-        name (str, optional): the name of the Function instance in the network
-
-    Returns:
-        :class:`~cntk.ops.functions.Function`
-
-    """
-    from cntk.cntk_py import binomial_random_variable
-    from cntk.internal import sanitize_shape, sanitize_dtype_cntk, sanitize_dynamic_axes
-
-    shape = sanitize_shape(shape)
-    dtype = get_default_override(None, dtype=dtype)
-    if dtype is None:
-        dtype = np.float32
-    dtype = sanitize_dtype_cntk(dtype)
-    dynamic_axes = sanitize_dynamic_axes(dynamic_axes)
-    return binomial_random_variable(shape, dtype, dynamic_axes, trials, success_prob, seed, name)
-
-
-@typemap
 def uniform_like(variable, low=0.0, high=1.0, seed=auto_select, name=''):
     """uniform_like(variable, low=0.0, high=1.0, seed=auto_select, name='')
     Generates samples from the uniform distribution in the interval [`low`,`high`).
@@ -247,21 +216,3 @@ def bernoulli_like(variable, mean=0.5, seed=auto_select, name=''):
     return bernoulli_random_variable_like(variable, mean, seed, name)
 
 
-@typemap
-def binomial_like(variable, trials=1, success_prob=0.5, seed=auto_select, name=''):
-    """binomial_like(variable, trials=1, success_prob=0.5, seed=auto_select, name='')
-    Generates samples from the Binomial distribution with `trials` trials and success probability `success_prob`.
-
-    Args:
-        variable: cntk variable (input, output, parameter, or constant) from which to copy the shape, data type, and dynamic axes.
-        trials (int): number of trials
-        success_prob (float): success probability
-        seed (int): pseudo random number generator seed
-        name (str, optional): the name of the Function instance in the network
-
-    Returns:
-        :class:`~cntk.ops.functions.Function`
-
-    """
-    from cntk.cntk_py import binomial_random_variable_like
-    return binomial(variable, trials, success_prob, seed, name)

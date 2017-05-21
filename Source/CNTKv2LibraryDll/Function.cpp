@@ -1181,22 +1181,114 @@ namespace CNTK
         additionalProperties[PrimitiveFunction::AttributeNameRngOffset] = size_t(0);
 
         return UnaryOp(PrimitiveOpType::Dropout, operand, std::move(additionalProperties), name);
-    }
+    } 
 
-    FunctionPtr RandomVariable(const NDShape& shape, DataType dataType, const std::vector<Axis>& dynamicAxes, double low, double high, unsigned long seed, const std::wstring& name)
+    Dictionary CreateRandomVariableAttributes(RandomVariableType rvtype, const NDShape& shape, DataType dataType, const std::vector<Axis>& dynamicAxes, unsigned long seed)
     {
         auto additionalProperties = Dictionary();
 
-        additionalProperties[PrimitiveFunction::AttributeNameNewShape] = shape;
-        additionalProperties[PrimitiveFunction::AttributeNameNewDynamicAxes] = AsDictionaryValueVector(dynamicAxes);
-        additionalProperties[PrimitiveFunction::AttributeNameNewDataType] = static_cast<int>(dataType);
         if (seed == SentinelValueForAutoSelectRandomSeed)
             seed = Internal::GenerateRandomSeed(true);
 
-        additionalProperties[PrimitiveFunction::AttributeNameRngSeed] = size_t(seed);
-        additionalProperties[PrimitiveFunction::AttributeNameRngOffset] = size_t(0);
+        additionalProperties.Add(
+            PrimitiveFunction::AttributeNameRandomVariableType, static_cast<int>(rvtype),
+            PrimitiveFunction::AttributeNameNewShape, shape,
+            PrimitiveFunction::AttributeNameNewDynamicAxes, AsDictionaryValueVector(dynamicAxes),
+            PrimitiveFunction::AttributeNameNewDataType, static_cast<int>(dataType),
+            PrimitiveFunction::AttributeNameRngSeed, size_t(seed),
+            PrimitiveFunction::AttributeNameRngOffset, size_t(0));
 
-        return NullaryOp(PrimitiveOpType::RandomUniform, std::move(additionalProperties), name);
+        return additionalProperties;
+    }
+
+    Dictionary CreateRandomVariableAttributes(RandomVariableType rvtype, unsigned long seed)
+    {
+        auto additionalProperties = Dictionary();
+
+        if (seed == SentinelValueForAutoSelectRandomSeed)
+            seed = Internal::GenerateRandomSeed(true);
+
+        additionalProperties.Add(
+            PrimitiveFunction::AttributeNameRandomVariableType, static_cast<int>(rvtype),
+            PrimitiveFunction::AttributeNameRngSeed, size_t(seed),
+            PrimitiveFunction::AttributeNameRngOffset, size_t(0));
+
+        return additionalProperties;
+    }
+
+    FunctionPtr UniformRandomVariable(const NDShape& shape, DataType dataType, const std::vector<Axis>& dynamicAxes, 
+        double low, double high, unsigned long seed, const std::wstring& name)
+    {
+        Dictionary additionalProperties = CreateRandomVariableAttributes(RandomVariableType::Uniform, shape, dataType, dynamicAxes, seed);
+        additionalProperties.Add(
+            PrimitiveFunction::AttributeNameRandomVariableArg0, low,
+            PrimitiveFunction::AttributeNameRandomVariableArg1, high);
+        return NullaryOp(PrimitiveOpType::RandomVariable, std::move(additionalProperties), name);
+    }
+
+    FunctionPtr NormalRandomVariable(const NDShape& shape, DataType dataType, const std::vector<Axis>& dynamicAxes,
+        double mean, double scale, unsigned long seed, const std::wstring& name)
+    {
+        Dictionary additionalProperties = CreateRandomVariableAttributes(RandomVariableType::Normal, shape, dataType, dynamicAxes, seed);
+        additionalProperties.Add(
+            PrimitiveFunction::AttributeNameRandomVariableArg0, mean,
+            PrimitiveFunction::AttributeNameRandomVariableArg1, scale);
+        return NullaryOp(PrimitiveOpType::RandomVariable, std::move(additionalProperties), name);
+    }
+
+    FunctionPtr GumbelRandomVariable(const NDShape& shape, DataType dataType, const std::vector<Axis>& dynamicAxes,
+        double loc, double scale, unsigned long seed, const std::wstring& name)
+    {
+        Dictionary additionalProperties = CreateRandomVariableAttributes(RandomVariableType::Gumbel, shape, dataType, dynamicAxes, seed);
+        additionalProperties.Add(
+            PrimitiveFunction::AttributeNameRandomVariableArg0, loc,
+            PrimitiveFunction::AttributeNameRandomVariableArg1, scale);
+        return NullaryOp(PrimitiveOpType::RandomVariable, std::move(additionalProperties), name);
+    }
+
+    FunctionPtr BernoulliRandomVariable(const NDShape& shape, DataType dataType, const std::vector<Axis>& dynamicAxes,
+        double mean, unsigned long seed, const std::wstring& name)
+    {
+        Dictionary additionalProperties = CreateRandomVariableAttributes(RandomVariableType::Bernoulli, shape, dataType, dynamicAxes, seed);
+        additionalProperties.Add(PrimitiveFunction::AttributeNameRandomVariableArg0, mean);
+        return NullaryOp(PrimitiveOpType::RandomVariable, std::move(additionalProperties), name);
+    }
+
+
+    FunctionPtr UniformRandomVariableLike(const Variable& operand, double low, double high, unsigned long seed, const std::wstring& name)
+    {
+        Dictionary additionalProperties = CreateRandomVariableAttributes(RandomVariableType::Uniform, seed);
+        additionalProperties.Add(
+            PrimitiveFunction::AttributeNameRandomVariableArg0, low,
+            PrimitiveFunction::AttributeNameRandomVariableArg1, high);
+        return UnaryOp(PrimitiveOpType::RandomVariableLike, operand, std::move(additionalProperties), name);
+    }
+
+    FunctionPtr NormalRandomVariableLike(const Variable& operand, double mean, double scale, unsigned long seed, const std::wstring& name)
+    {
+        Dictionary additionalProperties = CreateRandomVariableAttributes(RandomVariableType::Normal, seed);
+        additionalProperties.Add(
+            PrimitiveFunction::AttributeNameRandomVariableArg0, mean,
+            PrimitiveFunction::AttributeNameRandomVariableArg1, scale);
+        return UnaryOp(PrimitiveOpType::RandomVariableLike, operand, std::move(additionalProperties), name);
+    }
+
+    FunctionPtr GumbelRandomVariableLike(const Variable& operand,
+        double loc, double scale, unsigned long seed, const std::wstring& name)
+    {
+        Dictionary additionalProperties = CreateRandomVariableAttributes(RandomVariableType::Gumbel, seed);
+        additionalProperties.Add(
+            PrimitiveFunction::AttributeNameRandomVariableArg0, loc,
+            PrimitiveFunction::AttributeNameRandomVariableArg1, scale);
+        return UnaryOp(PrimitiveOpType::RandomVariableLike, operand, std::move(additionalProperties), name);
+    }
+
+    FunctionPtr BernoulliRandomVariableLike(const Variable& operand,
+        double mean, unsigned long seed, const std::wstring& name)
+    {
+        Dictionary additionalProperties = CreateRandomVariableAttributes(RandomVariableType::Bernoulli, seed);
+        additionalProperties.Add(PrimitiveFunction::AttributeNameRandomVariableArg0, mean);
+        return UnaryOp(PrimitiveOpType::RandomVariableLike, operand, std::move(additionalProperties), name);
     }
 
     FunctionPtr Reshape(const Variable& operand, const NDShape& replacementShape, const Axis& beginAxis, const Axis& endAxis, const std::wstring& name)

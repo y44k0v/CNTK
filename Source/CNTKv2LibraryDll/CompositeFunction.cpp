@@ -527,7 +527,7 @@ namespace CNTK
         else
         {
             assert(variable.IsOutput());
-            if (variable.Owner()->OpName() == L"RandomUniform")
+            if (variable.Owner()->OpName() == L"RandomVariable") //kapow
             {
                 //These checks are similar but different from the input variable checks
                 if (variable.Shape().HasUnboundDimension())
@@ -550,7 +550,10 @@ namespace CNTK
                     CNTK::LogicError("Random Variable '%ls' has %zd dynamic axes; currently only <= 2 dynamic axes are supported.",
                         variable.AsString().c_str(), dynamicAxes.size());
 
-                computationNodePtr = builder.CreateRandomUniformNode(internalNodeName, AsTensorShape(variable.Shape()), internalDynamicAxisName);
+                Dictionary attr = variable.Owner()->RootFunction()->Attributes();
+                int rvtype = attr[PrimitiveFunction::AttributeNameRandomVariableType].Value<int>();
+
+                computationNodePtr = builder.CreateRandomVariableNode(internalNodeName, rvtype, AsTensorShape(variable.Shape()), internalDynamicAxisName);
             }
             else 
             {
@@ -781,11 +784,12 @@ namespace CNTK
                     computationNodePtr->As<DropoutNode<ElementType>>()->SetDropoutRate(dropoutRate);
                     break;
                 }
-                case PrimitiveOpType::RandomUniform:
+                case PrimitiveOpType::RandomVariable:
                 {
                     //kapow
                     auto seed = functionConfig[PrimitiveFunction::AttributeNameRngSeed].Value<size_t>();
                     auto offset = functionConfig[PrimitiveFunction::AttributeNameRngOffset].Value<size_t>();
+                    auto rvtype = functionConfig[PrimitiveFunction::AttributeNameRandomVariableType].Value<int>();
 
                     auto shape = functionConfig[PrimitiveFunction::AttributeNameNewShape].Value<NDShape>();
                     auto dynamicAxes = AsVector<Axis>(functionConfig[PrimitiveFunction::AttributeNameNewDynamicAxes].Value<std::vector<DictionaryValue>>());
@@ -797,8 +801,17 @@ namespace CNTK
                         internalDynamicAxisName = InternalDynamicAxisNameFromDynamicAxes(dynamicAxes);
                     }
 
-                    computationNodePtr = New<RandomUniformNode<ElementType>>(network->GetDeviceId(), internalNodeName, AsTensorShape(shape), internalDynamicAxisName);
-                    computationNodePtr->As<RandomUniformNode<ElementType>>()->SetRngState(seed, offset);
+                    computationNodePtr = New<RandomVariableNode<ElementType>>(network->GetDeviceId(), internalNodeName, rvtype, AsTensorShape(shape), internalDynamicAxisName);
+                    computationNodePtr->As<RandomVariableNode<ElementType>>()->SetRngState(seed, offset);
+                    break;
+                }
+                case PrimitiveOpType::RandomVariableLike:
+                {
+                    auto seed = functionConfig[PrimitiveFunction::AttributeNameRngSeed].Value<size_t>();
+                    auto offset = functionConfig[PrimitiveFunction::AttributeNameRngOffset].Value<size_t>();
+                    auto rvtype = functionConfig[PrimitiveFunction::AttributeNameRandomVariableType].Value<int>();
+                    computationNodePtr = New<RandomVariableNode<ElementType>>(network->GetDeviceId(), internalNodeName, rvtype);
+                    computationNodePtr->As<RandomVariableNode<ElementType>>()->SetRngState(seed, offset);
                     break;
                 }
                 case PrimitiveOpType::Reshape:

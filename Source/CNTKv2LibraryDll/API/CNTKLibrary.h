@@ -3609,10 +3609,77 @@ namespace CNTK
     ///
     CNTK_API FunctionPtr Dropout(const Variable& operand, double dropoutRate, unsigned long seed = SentinelValueForAutoSelectRandomSeed, const std::wstring& name = L"");
 
+
     ///
-    /// Create an instance of the dropout operation on specified tensor input operand
+    /// Enumeration type denoting distributions.
     ///
-    CNTK_API FunctionPtr RandomVariable(const NDShape& shape, DataType dataType, const std::vector<Axis>& dynamicAxes = Axis::DefaultInputVariableDynamicAxes(), double low=0.0, double high=1.0, unsigned long seed = SentinelValueForAutoSelectRandomSeed, const std::wstring& name = L"");
+    enum class RandomVariableType : int
+    {
+        Unknown = 0,
+        Uniform = 1,
+        Normal  = 2,
+        Gumbel  = 3,
+        Bernoulli = 4,
+        /* TODO:
+        //easy
+        Exponential,
+        Lognormal,
+        Logistic,
+        Laplace,
+        Pareto,
+        Cauchy,
+        //harder
+        Gamma,
+        Binomial,
+        Poisson,
+        etc.
+        */
+        Sentinel
+    };
+
+    ///
+    /// Create an instance of a uniform random variable operation. This produces random numbers with the specified shape and dynamic axes, uniformly distributed in [low, high)
+    ///
+    CNTK_API FunctionPtr UniformRandomVariable(const NDShape& shape, DataType dataType, const std::vector<Axis>& dynamicAxes = Axis::DefaultInputVariableDynamicAxes(), 
+                                               double low=0.0, double high=1.0, unsigned long seed = SentinelValueForAutoSelectRandomSeed, const std::wstring& name = L"");
+
+    ///
+    /// Create an instance of a normal random variable operation. This produces random numbers with the specified shape and dynamic axes, normally distributed with the specified mean and standard deviation (scale)
+    ///
+    CNTK_API FunctionPtr NormalRandomVariable(const NDShape& shape, DataType dataType, const std::vector<Axis>& dynamicAxes = Axis::DefaultInputVariableDynamicAxes(), 
+                                              double mean = 0.0, double scale = 1.0, unsigned long seed = SentinelValueForAutoSelectRandomSeed, const std::wstring& name = L"");
+
+    ///
+    /// Create an instance of a Gumbel random variable operation. This produces random numbers with the specified shape and dynamic axes, distributed according to the Gumbel distribution with the specified location and scale
+    ///
+    CNTK_API FunctionPtr GumbelRandomVariable(const NDShape& shape, DataType dataType, const std::vector<Axis>& dynamicAxes = Axis::DefaultInputVariableDynamicAxes(), 
+                                              double loc = 0.0, double scale = 1.0, unsigned long seed = SentinelValueForAutoSelectRandomSeed, const std::wstring& name = L"");
+
+    ///
+    /// Create an instance of a Bernoulli random variable operation. This produces random numbers with the specified shape and dynamic axes, distributed according to the Bernoulli distribution with the specified success probability
+    ///
+    CNTK_API FunctionPtr BernoulliRandomVariable(const NDShape& shape, DataType dataType, const std::vector<Axis>& dynamicAxes = Axis::DefaultInputVariableDynamicAxes(), 
+                                                 double mean = 0.5, unsigned long seed = SentinelValueForAutoSelectRandomSeed, const std::wstring& name = L"");
+
+    ///
+    /// Create an instance of a uniform random variable operation. This produces random numbers with the shape and dynamic axes specified by the operand, uniformly distributed in [low, high)
+    ///
+    CNTK_API FunctionPtr UniformRandomVariableLike(const Variable& operand, double low = 0.0, double high = 1.0, unsigned long seed = SentinelValueForAutoSelectRandomSeed, const std::wstring& name = L"");
+
+    ///
+    /// Create an instance of a normal random variable operation. This produces random numbers with the shape and dynamic axes specified by the operand, normally distributed with the specified mean and standard deviation (scale)
+    ///
+    CNTK_API FunctionPtr NormalRandomVariableLike(const Variable& operand, double mean = 0.0, double scale = 1.0, unsigned long seed = SentinelValueForAutoSelectRandomSeed, const std::wstring& name = L"");
+
+    ///
+    /// Create an instance of a Gumbel random variable operation. This produces random numbers with the shape and dynamic axes specified by the operand, distributed according to the Gumbel distribution with the specified location and scale
+    ///
+    CNTK_API FunctionPtr GumbelRandomVariableLike(const Variable& operand, double loc = 0.0, double scale = 1.0, unsigned long seed = SentinelValueForAutoSelectRandomSeed, const std::wstring& name = L"");
+
+    ///
+    /// Create an instance of a Bernoulli random variable operation. This produces random numbers with the shape and dynamic axes specified by the operand, distributed according to the Bernoulli distribution with the specified success probability
+    ///
+    CNTK_API FunctionPtr BernoulliRandomVariableLike(const Variable& operand, double mean = 0.5, unsigned long seed = SentinelValueForAutoSelectRandomSeed, const std::wstring& name = L"");
 
     ///
     /// Create an instance of the reshape operation on specified tensor input operand

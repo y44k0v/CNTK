@@ -1086,7 +1086,17 @@ void GPUMatrix<ElemType>::SetUniformRandomValue(const ElemType low, const ElemTy
 }
 
 template <class ElemType>
-void GPUMatrix<ElemType>::SetUniformRandomValue(RNGHandle& rngHandle)
+void GPUMatrix<ElemType>::SetUniformRandomValue(RNGHandle& rngHandle, const ElemType low, const ElemType high)
+{
+}
+
+template <class ElemType>
+void GPUMatrix<ElemType>::SetGaussianRandomValue(RNGHandle& rngHandle, const ElemType mean, const ElemType stdev)
+{
+}
+
+template <class ElemType>
+void GPUMatrix<ElemType>::SetGumbelRandomValue(RNGHandle& rngHandle, const ElemType loc, const ElemType scale)
 {
 }
 

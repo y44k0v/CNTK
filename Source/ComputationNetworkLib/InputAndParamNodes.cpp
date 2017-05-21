@@ -654,24 +654,44 @@ template class LearnableParameter<double>;
 
 
 template <class ElemType>
-/*virtual*/ void RandomUniformNode<ElemType>::ForwardProp(const FrameRange& fr) /*override*/
+/*virtual*/ void RandomVariableNode<ElemType>::ForwardProp(const FrameRange& fr) /*override*/
 {
     auto&& result = ValueFor(fr);
-    //We call random uniform straight on the undelying buffer
-    result.SetUniformRandomValue(GetRNGHandle());
-    UpdateRngOffset(GetRngOffset() + result.GetNumElements());
+    switch (m_distribution)
+    {
+    case 1: /* RandomVariableType::Uniform: */
+        //We call random uniform straight on the undelying buffer
+        result.SetUniformRandomValue(GetRNGHandle(), 0, 1);
+        UpdateRngOffset(GetRngOffset() + result.GetNumElements());
+        break;
+    case 2: /* RandomVariableType::Normal: */
+        //We call random uniform straight on the undelying buffer
+        result.SetGaussianRandomValue(GetRNGHandle(), 0, 1);
+        UpdateRngOffset(GetRngOffset() + asMultipleOf(result.GetNumElements(), 2));
+        break;
+    case 3: /* RandomVariableType::Gumbel: */
+        result.SetGumbelRandomValue(GetRNGHandle(), 0, 1);
+        UpdateRngOffset(GetRngOffset() + result.GetNumElements());
+        break;
+    case 4: /* RandomVariableType::Bernoulli: */
+        result.SetUniformRandomMask(0.5, 1, GetRNGHandle());
+        UpdateRngOffset(GetRngOffset() + result.GetNumElements());
+        break;
+    default:
+        RuntimeError("RandomVariableNode::ForwardProp: Unknown distribution type %d", m_distribution);
+    }
 }
 
 template <class ElemType>
-/*virtual*/ void RandomUniformNode<ElemType>::BackpropTo(const size_t /*inputIndex*/, const FrameRange&) /*override*/
+/*virtual*/ void RandomVariableNode<ElemType>::BackpropTo(const size_t /*inputIndex*/, const FrameRange&) /*override*/
 {
     LogicError("%ls %ls operation is a random variable and cannot BackpropTo() it.", NodeName().c_str(), OperationName().c_str());
 }
 
 template <class ElemType>
-/*virtual*/ bool RandomUniformNode<ElemType>::IsOutOfDateWrtInputs() const /*override*/ { return true; }
+/*virtual*/ bool RandomVariableNode<ElemType>::IsOutOfDateWrtInputs() const /*override*/ { return true; }
 
-template class RandomUniformNode<float>;
-template class RandomUniformNode<double>;
+template class RandomVariableNode<float>;
+template class RandomVariableNode<double>;
 
 }}}
