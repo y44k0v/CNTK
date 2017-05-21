@@ -1306,8 +1306,13 @@ namespace CNTK
 
     FunctionPtr BinaryCrossEntropy(const Variable& prediction, const Variable& targets, const std::wstring& name)
     {
-        std::vector<Variable> operands = { prediction, targets };
-        return AsComposite(MakeSharedObject<PrimitiveFunction>(PrimitiveOpType::Logistic, operands, Dictionary(), name), name);
+        auto predictionPlaceholder = PlaceholderVariable(L"prediction");
+        auto labelPlaceholder = PlaceholderVariable(L"targets");
+        Constant one_plus_eps = Constant::Scalar(1.0f+1e-6f);
+        Constant one = Constant::Scalar(1.0f);
+        Constant eps = Constant::Scalar(1e-6f);
+        FunctionPtr compositeBinaryCrossEntropy = Negate(Plus(ElementTimes(labelPlaceholder,Log(eps + predictionPlaceholder)), ElementTimes(Minus(one, labelPlaceholder), Log(Minus(one_plus_eps, predictionPlaceholder)))));
+        return AsBlock(std::move(compositeBinaryCrossEntropy), { { predictionPlaceholder, prediction },{ labelPlaceholder, targets } }, L"BinaryCrossEntropy", name);
     }
 
     FunctionPtr WeightedBinaryCrossEntropy(const Variable& prediction, const Variable& targets, const Variable& weights, const std::wstring& name)
