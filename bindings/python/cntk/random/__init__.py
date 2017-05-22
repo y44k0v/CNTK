@@ -171,7 +171,7 @@ def normal_like(variable, mean=0.0, scale=1.0, seed=auto_select, name=''):
         :class:`~cntk.ops.functions.Function`
     """
     from cntk.cntk_py import normal_random_variable_like
-    return normal_random_variable_like(variable.shape, variable.dtype, variable.dynamic_axes, mean, scale, seed, name)
+    return normal_random_variable_like(variable, mean, scale, seed, name)
 
 
 @typemap

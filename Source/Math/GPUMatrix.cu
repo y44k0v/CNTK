@@ -1362,9 +1362,9 @@ void GPUMatrix<ElemType>::SetGaussianRandomValue(RNGHandle& rngHandle, const Ele
         SyncGuard syncGuard;
         auto n = asMultipleOf(GetNumElements(), 2);
         if (sizeof(ElemType) == sizeof(float))
-            CURAND_CALL(curandGenerateNormal(((curandGenerator_t*)s_curandGenerator)[0], reinterpret_cast<float*>(Data()), n, (float)mean, (float)stdev));
+            CURAND_CALL(curandGenerateNormal(gpuRNGHandle->Generator(), reinterpret_cast<float*>(Data()), n, (float)mean, (float)stdev));
         else
-            CURAND_CALL(curandGenerateNormalDouble(((curandGenerator_t*)s_curandGenerator)[0], reinterpret_cast<double*>(Data()), n, (double)mean, (double)stdev));
+            CURAND_CALL(curandGenerateNormalDouble(gpuRNGHandle->Generator(), reinterpret_cast<double*>(Data()), n, (double)mean, (double)stdev));
     }
 }
 

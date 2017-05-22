@@ -408,6 +408,84 @@ namespace CNTK
         }
     }
 
+    template <typename ElementType>
+    ComputationNodeBasePtr GetRandomVariableNode(int rvtype, const Dictionary& functionConfig, ComputationNetworkPtr& network, const std::wstring& internalNodeName, const NDShape& shape, const std::wstring& internalDynamicAxisName)
+    {
+        ComputationNodeBasePtr computationNodePtr = nullptr;
+        switch (rvtype)
+        {
+            case RandomVariableType::Uniform:
+            {
+                auto low = functionConfig[PrimitiveFunction::AttributeNameRandomVariableArg0].Value<double>();
+                auto high = functionConfig[PrimitiveFunction::AttributeNameRandomVariableArg1].Value<double>();
+                computationNodePtr = New<UniformRandomVariableNode<ElementType>>(network->GetDeviceId(), internalNodeName, AsTensorShape(shape), internalDynamicAxisName, ElementType(low), ElementType(high));
+                break;
+            }
+            case RandomVariableType::Normal:
+            {
+                auto mean = functionConfig[PrimitiveFunction::AttributeNameRandomVariableArg0].Value<double>();
+                auto stdev = functionConfig[PrimitiveFunction::AttributeNameRandomVariableArg1].Value<double>();
+                computationNodePtr = New<GaussianRandomVariableNode<ElementType>>(network->GetDeviceId(), internalNodeName, AsTensorShape(shape), internalDynamicAxisName, ElementType(mean), ElementType(stdev));
+                break;
+            }
+            case RandomVariableType::Gumbel:
+            {
+                auto loc = functionConfig[PrimitiveFunction::AttributeNameRandomVariableArg0].Value<double>();
+                auto scale = functionConfig[PrimitiveFunction::AttributeNameRandomVariableArg1].Value<double>();
+                computationNodePtr = New<GumbelRandomVariableNode<ElementType>>(network->GetDeviceId(), internalNodeName, AsTensorShape(shape), internalDynamicAxisName, ElementType(loc), ElementType(scale));
+                break;
+            }
+            case RandomVariableType::Bernoulli:
+            {
+                auto successProb = functionConfig[PrimitiveFunction::AttributeNameRandomVariableArg0].Value<double>();
+                computationNodePtr = New<BernoulliRandomVariableNode<ElementType>>(network->GetDeviceId(), internalNodeName, AsTensorShape(shape), internalDynamicAxisName, ElementType(successProb));
+                break;
+            }
+            default:
+                LogicError("GetRandomVariableNode: Unknown distribution opcode %d", rvtype);
+        }
+        return computationNodePtr;
+    }
+
+    template <typename ElementType>
+    ComputationNodeBasePtr GetRandomVariableNode(int rvtype, const Dictionary& functionConfig, ComputationNetworkPtr& network, const std::wstring& internalNodeName)
+    {
+        ComputationNodeBasePtr computationNodePtr = nullptr;
+        switch (rvtype)
+        {
+        case RandomVariableType::Uniform:
+        {
+            auto low = functionConfig[PrimitiveFunction::AttributeNameRandomVariableArg0].Value<double>();
+            auto high = functionConfig[PrimitiveFunction::AttributeNameRandomVariableArg1].Value<double>();
+            computationNodePtr = New<UniformRandomVariableLikeNode<ElementType>>(network->GetDeviceId(), internalNodeName, ElementType(low), ElementType(high));
+            break;
+        }
+        case RandomVariableType::Normal:
+        {
+            auto mean = functionConfig[PrimitiveFunction::AttributeNameRandomVariableArg0].Value<double>();
+            auto stdev = functionConfig[PrimitiveFunction::AttributeNameRandomVariableArg1].Value<double>();
+            computationNodePtr = New<GaussianRandomVariableLikeNode<ElementType>>(network->GetDeviceId(), internalNodeName, ElementType(mean), ElementType(stdev));
+            break;
+        }
+        case RandomVariableType::Gumbel:
+        {
+            auto loc = functionConfig[PrimitiveFunction::AttributeNameRandomVariableArg0].Value<double>();
+            auto scale = functionConfig[PrimitiveFunction::AttributeNameRandomVariableArg1].Value<double>();
+            computationNodePtr = New<GumbelRandomVariableLikeNode<ElementType>>(network->GetDeviceId(), internalNodeName, ElementType(loc), ElementType(scale));
+            break;
+        }
+        case RandomVariableType::Bernoulli:
+        {
+            auto successProb = functionConfig[PrimitiveFunction::AttributeNameRandomVariableArg0].Value<double>();
+            computationNodePtr = New<BernoulliRandomVariableLikeNode<ElementType>>(network->GetDeviceId(), internalNodeName, ElementType(successProb));
+            break;
+        }
+        default:
+            LogicError("GetRandomVariableNode: Unknown distribution opcode %d", rvtype);
+        }
+        return computationNodePtr;
+    }
+
     // Recursively create a sub-network of ComputationNode instances corresponding to the graph of Functions 
     // underlying the specified 'variable' and return the ComputationNode instance that corresponds to the 
     // top level 'variable'
@@ -549,11 +627,11 @@ namespace CNTK
                 if (dynamicAxes.size() > 2)
                     CNTK::LogicError("Random Variable '%ls' has %zd dynamic axes; currently only <= 2 dynamic axes are supported.",
                         variable.AsString().c_str(), dynamicAxes.size());
+                // kapow
+                //Dictionary attr = variable.Owner()->RootFunction()->Attributes();
+                //int rvtype = attr[PrimitiveFunction::AttributeNameRandomVariableType].Value<int>();
 
-                Dictionary attr = variable.Owner()->RootFunction()->Attributes();
-                int rvtype = attr[PrimitiveFunction::AttributeNameRandomVariableType].Value<int>();
-
-                computationNodePtr = builder.CreateRandomVariableNode(internalNodeName, rvtype, AsTensorShape(variable.Shape()), internalDynamicAxisName);
+                computationNodePtr = builder.CreateRandomVariableNode(internalNodeName, AsTensorShape(variable.Shape()), internalDynamicAxisName);
             }
             else 
             {
@@ -800,20 +878,22 @@ namespace CNTK
                         // Construct the dynamic axis name to be used internally for the CNTK InputNodes
                         internalDynamicAxisName = InternalDynamicAxisNameFromDynamicAxes(dynamicAxes);
                     }
-
-                    computationNodePtr = New<RandomVariableNode<ElementType>>(network->GetDeviceId(), internalNodeName, rvtype, AsTensorShape(shape), internalDynamicAxisName);
+                    computationNodePtr = GetRandomVariableNode<ElementType>(rvtype, functionConfig, network, internalNodeName, shape, internalDynamicAxisName);
                     computationNodePtr->As<RandomVariableNode<ElementType>>()->SetRngState(seed, offset);
                     break;
                 }
+                
                 case PrimitiveOpType::RandomVariableLike:
                 {
                     auto seed = functionConfig[PrimitiveFunction::AttributeNameRngSeed].Value<size_t>();
                     auto offset = functionConfig[PrimitiveFunction::AttributeNameRngOffset].Value<size_t>();
                     auto rvtype = functionConfig[PrimitiveFunction::AttributeNameRandomVariableType].Value<int>();
-                    computationNodePtr = New<RandomVariableNode<ElementType>>(network->GetDeviceId(), internalNodeName, rvtype);
-                    computationNodePtr->As<RandomVariableNode<ElementType>>()->SetRngState(seed, offset);
+                    computationNodePtr = GetRandomVariableNode<ElementType>(rvtype, functionConfig, network, internalNodeName);
+                    //computationNodePtr = New<RandomVariableNode<ElementType>>(network->GetDeviceId(), internalNodeName, rvtype);
+                    computationNodePtr->As<RandomVariableLikeNode<ElementType>>()->SetRngState(seed, offset);
                     break;
                 }
+                
                 case PrimitiveOpType::Reshape:
                 {
                     auto beginAxis = Axis(0);

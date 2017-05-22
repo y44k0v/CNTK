@@ -355,7 +355,7 @@ public:
     {
         // don't touch our values
         // But take the opportunity for an additional check. Why not.
-        /*
+        /* kapow
         if (Value().GetNumRows() != GetSampleLayout().GetNumElements())
             LogicError("UpdateFunctionMBSize: m_value not matching m_sampleLayout");
         */
@@ -475,7 +475,7 @@ template class SparseInputValue<double>;
 
 // -----------------------------------------------------------------------
 // RandomVariableNode (/*no input*/)
-// a uniform random variable
+// a random variable
 // -----------------------------------------------------------------------
 
 template <class ElemType>
@@ -488,24 +488,16 @@ public:
     RandomVariableNode(DEVICEID_TYPE deviceId, const wstring& name)
         : Base(deviceId, name, false, L"")
     {
-        m_distribution = 1; //RandomVariableType::Uniform;
+        SetRngState(CreateUniqId());
     }
 
-    RandomVariableNode(DEVICEID_TYPE deviceId, const wstring& name, int distribution)
-        : Base(deviceId, name, false, L"")
-    {
-        if (distribution <= 1 /*RandomVariableType::Unknown*/ || distribution >= 5 /*RandomVariableType::Sentinel*/)
-            InvalidArgument("RandomVariableNode: Unknown distribution type %d", distribution);
-        m_distribution = distribution;
-    }
-
-    RandomVariableNode(DEVICEID_TYPE deviceId, const wstring& name, int distribution, const TensorShape& sampleLayout, const wstring& dynamicAxisName)
+    RandomVariableNode(DEVICEID_TYPE deviceId, const wstring& name, const TensorShape& sampleLayout, const wstring& dynamicAxisName)
         : Base(deviceId, name, sampleLayout, false, dynamicAxisName)
     {
-        if (distribution <= 1 /*RandomVariableType::Unknown*/ || distribution >= 5 /*RandomVariableType::Sentinel*/)
-            InvalidArgument("RandomVariableNode: Unknown distribution type %d", distribution);
-        m_distribution = distribution;
     }
+
+    virtual bool OutputUsedInComputingInputNodesGradients() const override { return false; }
+    virtual bool InputUsedInComputingInputNodesGradients(size_t /*childIndex*/) const override { return false; }
 
     virtual void /*ComputationNode::*/ ForwardProp(const FrameRange&) override;
     virtual void /*ComputationNode::*/ BackpropTo(const size_t /*inputIndex*/, const FrameRange&) override;
@@ -515,8 +507,189 @@ public:
     {
         return RngUser::GetRNGHandle(ValuePtr()->GetDeviceId());
     }
+};
+
+template <class ElemType>
+class UniformRandomVariableNode : public RandomVariableNode<ElemType>
+{
+public:
+    UniformRandomVariableNode(DEVICEID_TYPE deviceId, const wstring& name, ElemType low, ElemType high)
+        : RandomVariableNode<ElemType>(deviceId, name), m_low(low), m_high(high)
+    {
+    }
+    UniformRandomVariableNode(DEVICEID_TYPE deviceId, const wstring& name, const TensorShape& sampleLayout, const wstring& dynamicAxisName, ElemType low, ElemType high)
+        : RandomVariableNode<ElemType>(deviceId, name, sampleLayout, dynamicAxisName), m_low(low), m_high(high)
+    {
+    }
+    virtual void /*ComputationNode::*/ ForwardProp(const FrameRange&) override;
 private:
-    int m_distribution;
+    ElemType m_low;
+    ElemType m_high;
+};
+
+template <class ElemType>
+class GaussianRandomVariableNode : public RandomVariableNode<ElemType>
+{
+public:
+    GaussianRandomVariableNode(DEVICEID_TYPE deviceId, const wstring& name, ElemType mean, ElemType stdev)
+        : RandomVariableNode<ElemType>(deviceId, name), m_mean(mean), m_stdev(stdev)
+    {
+    }
+    GaussianRandomVariableNode(DEVICEID_TYPE deviceId, const wstring& name, const TensorShape& sampleLayout, const wstring& dynamicAxisName, ElemType mean, ElemType stdev)
+        : RandomVariableNode<ElemType>(deviceId, name, sampleLayout, dynamicAxisName), m_mean(mean), m_stdev(stdev)
+    {
+    }
+    virtual void /*ComputationNode::*/ ForwardProp(const FrameRange&) override;
+private:
+    ElemType m_mean;
+    ElemType m_stdev;
+};
+
+template <class ElemType>
+class GumbelRandomVariableNode : public RandomVariableNode<ElemType>
+{
+public:
+    GumbelRandomVariableNode(DEVICEID_TYPE deviceId, const wstring& name, ElemType loc, ElemType scale)
+        : RandomVariableNode<ElemType>(deviceId, name), m_loc(loc), m_scale(scale)
+    {
+    }
+    GumbelRandomVariableNode(DEVICEID_TYPE deviceId, const wstring& name, const TensorShape& sampleLayout, const wstring& dynamicAxisName, ElemType loc, ElemType scale)
+        : RandomVariableNode<ElemType>(deviceId, name, sampleLayout, dynamicAxisName), m_loc(loc), m_scale(scale)
+    {
+    }
+    virtual void /*ComputationNode::*/ ForwardProp(const FrameRange&) override;
+private:
+    ElemType m_loc;
+    ElemType m_scale;
+};
+
+template <class ElemType>
+class BernoulliRandomVariableNode : public RandomVariableNode<ElemType>
+{
+public:
+    BernoulliRandomVariableNode(DEVICEID_TYPE deviceId, const wstring& name, ElemType successProb)
+        : RandomVariableNode<ElemType>(deviceId, name), m_successProb(successProb)
+    {
+    }
+    BernoulliRandomVariableNode(DEVICEID_TYPE deviceId, const wstring& name, const TensorShape& sampleLayout, const wstring& dynamicAxisName, ElemType successProb)
+        : RandomVariableNode<ElemType>(deviceId, name, sampleLayout, dynamicAxisName), m_successProb(successProb)
+    {
+    }
+    virtual void /*ComputationNode::*/ ForwardProp(const FrameRange&) override;
+
+private:
+    ElemType m_successProb;
+};
+
+
+// -----------------------------------------------------------------------
+// RandomVariableLikeNode (input)
+// create a random variable like the input
+// -----------------------------------------------------------------------
+template <class ElemType>
+class RandomVariableLikeNode : public ComputationNode<ElemType>, public NumInputs<1>, public RngUser
+{
+    typedef ComputationNode<ElemType> Base;
+    UsingComputationNodeMembersBoilerplate;
+    static const std::wstring TypeName() { return L"RandomVariableLike"; }
+
+public:
+    RandomVariableLikeNode(DEVICEID_TYPE deviceId, const wstring& name)
+        : Base(deviceId, name)
+    {
+        SetRngState(CreateUniqId());
+    }
+
+    virtual void /*ComputationNode::*/ BackpropTo(const size_t inputIndex, const FrameRange& fr) override
+    {
+        LogicError("%ls %ls operation is a random variable and cannot BackpropTo() it.", NodeName().c_str(), OperationName().c_str());
+    }
+
+    virtual bool OutputUsedInComputingInputNodesGradients() const override { return false; }
+    virtual bool InputUsedInComputingInputNodesGradients(size_t /*childIndex*/) const override { return false; }
+
+    virtual void /*ComputationNode::*/ ForwardProp(const FrameRange& fr) override;
+    virtual void /*ComputationNodeBase::*/ Validate(bool isFinalValidationPass) override
+    {
+        //kapow. necessary?
+        ValidateUnaryMap(isFinalValidationPass);
+    }
+
+    RNGHandle& GetRNGHandle()
+    {
+        return RngUser::GetRNGHandle(ValuePtr()->GetDeviceId());
+    }
+
+    //kapow. necessary?
+    virtual void CopyTo(ComputationNodeBasePtr nodeP, const std::wstring& newName, const CopyNodeFlags flags) const override
+    {
+        Base::CopyTo(nodeP, newName, flags);
+        if (flags & CopyNodeFlags::copyNodeValue)
+        {
+            auto node = dynamic_pointer_cast<RandomVariableLikeNode<ElemType>>(nodeP);
+            node->SetRngState(GetRngSeed(), GetRngOffset());
+        }
+    }
+    
+    //kapow. necessary?
+    virtual bool IsOutOfDateWrtInputs() const override { return true; }
+};
+
+template <class ElemType>
+class UniformRandomVariableLikeNode : public RandomVariableLikeNode<ElemType>
+{
+public:
+    UniformRandomVariableLikeNode(DEVICEID_TYPE deviceId, const wstring& name, ElemType low, ElemType high)
+        : RandomVariableLikeNode<ElemType>(deviceId, name), m_low(low), m_high(high)
+    {
+    }
+
+    virtual void /*ComputationNode::*/ ForwardProp(const FrameRange&) override;
+private:
+    ElemType m_low;
+    ElemType m_high;
+};
+
+template <class ElemType>
+class GaussianRandomVariableLikeNode : public RandomVariableLikeNode<ElemType>
+{
+public:
+    GaussianRandomVariableLikeNode(DEVICEID_TYPE deviceId, const wstring& name, ElemType mean, ElemType stdev)
+        : RandomVariableLikeNode<ElemType>(deviceId, name), m_mean(mean), m_stdev(stdev)
+    {
+    }
+    virtual void /*ComputationNode::*/ ForwardProp(const FrameRange&) override;
+private:
+    ElemType m_mean;
+    ElemType m_stdev;
+};
+
+template <class ElemType>
+class GumbelRandomVariableLikeNode : public RandomVariableLikeNode<ElemType>
+{
+public:
+    GumbelRandomVariableLikeNode(DEVICEID_TYPE deviceId, const wstring& name, ElemType loc, ElemType scale)
+        : RandomVariableLikeNode<ElemType>(deviceId, name), m_loc(loc), m_scale(scale)
+    {
+    }
+    virtual void /*ComputationNode::*/ ForwardProp(const FrameRange&) override;
+private:
+    ElemType m_loc;
+    ElemType m_scale;
+};
+
+template <class ElemType>
+class BernoulliRandomVariableLikeNode : public RandomVariableLikeNode<ElemType>
+{
+public:
+    BernoulliRandomVariableLikeNode(DEVICEID_TYPE deviceId, const wstring& name, ElemType successProb)
+        : RandomVariableLikeNode<ElemType>(deviceId, name), m_successProb(successProb)
+    {
+    }
+    virtual void /*ComputationNode::*/ ForwardProp(const FrameRange&) override;
+
+private:
+    ElemType m_successProb;
 };
 
 

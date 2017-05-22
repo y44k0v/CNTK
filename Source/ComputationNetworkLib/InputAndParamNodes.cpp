@@ -656,30 +656,43 @@ template class LearnableParameter<double>;
 template <class ElemType>
 /*virtual*/ void RandomVariableNode<ElemType>::ForwardProp(const FrameRange& fr) /*override*/
 {
+    // not clear what the base class ForwardProp should do. For now, behave like uniform (0,1)
     auto&& result = ValueFor(fr);
-    switch (m_distribution)
-    {
-    case 1: /* RandomVariableType::Uniform: */
-        //We call random uniform straight on the undelying buffer
-        result.SetUniformRandomValue(GetRNGHandle(), 0, 1);
-        UpdateRngOffset(GetRngOffset() + result.GetNumElements());
-        break;
-    case 2: /* RandomVariableType::Normal: */
-        //We call random uniform straight on the undelying buffer
-        result.SetGaussianRandomValue(GetRNGHandle(), 0, 1);
-        UpdateRngOffset(GetRngOffset() + asMultipleOf(result.GetNumElements(), 2));
-        break;
-    case 3: /* RandomVariableType::Gumbel: */
-        result.SetGumbelRandomValue(GetRNGHandle(), 0, 1);
-        UpdateRngOffset(GetRngOffset() + result.GetNumElements());
-        break;
-    case 4: /* RandomVariableType::Bernoulli: */
-        result.SetUniformRandomMask(0.5, 1, GetRNGHandle());
-        UpdateRngOffset(GetRngOffset() + result.GetNumElements());
-        break;
-    default:
-        RuntimeError("RandomVariableNode::ForwardProp: Unknown distribution type %d", m_distribution);
-    }
+    //We call random uniform straight on the undelying buffer
+    result.SetUniformRandomValue(GetRNGHandle(), 0, 1);
+    UpdateRngOffset(GetRngOffset() + result.GetNumElements());
+}
+
+template <class ElemType>
+/*virtual*/ void UniformRandomVariableNode<ElemType>::ForwardProp(const FrameRange& fr) /*override*/
+{
+    auto&& result = ValueFor(fr);
+    result.SetUniformRandomValue(GetRNGHandle(), m_low, m_high);
+    UpdateRngOffset(GetRngOffset() + result.GetNumElements());
+}
+
+template <class ElemType>
+/*virtual*/ void GaussianRandomVariableNode<ElemType>::ForwardProp(const FrameRange& fr) /*override*/
+{
+    auto&& result = ValueFor(fr);
+    result.SetGaussianRandomValue(GetRNGHandle(), m_mean, m_stdev);
+    UpdateRngOffset(GetRngOffset() + asMultipleOf(result.GetNumElements(), 2));
+}
+
+template <class ElemType>
+/*virtual*/ void GumbelRandomVariableNode<ElemType>::ForwardProp(const FrameRange& fr) /*override*/
+{
+    auto&& result = ValueFor(fr);
+    result.SetGumbelRandomValue(GetRNGHandle(), m_loc, m_scale);
+    UpdateRngOffset(GetRngOffset() + result.GetNumElements());
+}
+
+template <class ElemType>
+/*virtual*/ void BernoulliRandomVariableNode<ElemType>::ForwardProp(const FrameRange& fr) /*override*/
+{
+    auto&& result = ValueFor(fr);
+    result.SetUniformRandomMask(ElemType(1-m_successProb), ElemType(1), GetRNGHandle());
+    UpdateRngOffset(GetRngOffset() + result.GetNumElements());
 }
 
 template <class ElemType>
@@ -691,7 +704,69 @@ template <class ElemType>
 template <class ElemType>
 /*virtual*/ bool RandomVariableNode<ElemType>::IsOutOfDateWrtInputs() const /*override*/ { return true; }
 
+
+template <class ElemType>
+/*virtual*/ void RandomVariableLikeNode<ElemType>::ForwardProp(const FrameRange& fr) /*override*/
+{
+    // not clear what the base class ForwardProp should do. For now, behave like uniform (0,1)
+    auto&& result = ValueFor(fr);
+    //We call random uniform straight on the undelying buffer
+    result.SetUniformRandomValue(GetRNGHandle(), 0, 1);
+    UpdateRngOffset(GetRngOffset() + result.GetNumElements());
+}
+
+template <class ElemType>
+/*virtual*/ void UniformRandomVariableLikeNode<ElemType>::ForwardProp(const FrameRange& fr) /*override*/
+{
+    auto&& result = ValueFor(fr);
+    result.SetUniformRandomValue(GetRNGHandle(), m_low, m_high);
+    UpdateRngOffset(GetRngOffset() + result.GetNumElements());
+}
+
+template <class ElemType>
+/*virtual*/ void GaussianRandomVariableLikeNode<ElemType>::ForwardProp(const FrameRange& fr) /*override*/
+{
+    auto&& result = ValueFor(fr);
+    result.SetGaussianRandomValue(GetRNGHandle(), m_mean, m_stdev);
+    UpdateRngOffset(GetRngOffset() + asMultipleOf(result.GetNumElements(), 2));
+}
+
+template <class ElemType>
+/*virtual*/ void GumbelRandomVariableLikeNode<ElemType>::ForwardProp(const FrameRange& fr) /*override*/
+{
+    auto&& result = ValueFor(fr);
+    result.SetGumbelRandomValue(GetRNGHandle(), m_loc, m_scale);
+    UpdateRngOffset(GetRngOffset() + result.GetNumElements());
+}
+
+template <class ElemType>
+/*virtual*/ void BernoulliRandomVariableLikeNode<ElemType>::ForwardProp(const FrameRange& fr) /*override*/
+{
+    auto&& result = ValueFor(fr);
+    result.SetUniformRandomMask(ElemType(1 - m_successProb), ElemType(1), GetRNGHandle());
+    UpdateRngOffset(GetRngOffset() + result.GetNumElements());
+}
+
 template class RandomVariableNode<float>;
 template class RandomVariableNode<double>;
+template class UniformRandomVariableNode<float>;
+template class UniformRandomVariableNode<double>;
+template class GaussianRandomVariableNode<float>;
+template class GaussianRandomVariableNode<double>;
+template class GumbelRandomVariableNode<float>;
+template class GumbelRandomVariableNode<double>;
+template class BernoulliRandomVariableNode<float>;
+template class BernoulliRandomVariableNode<double>;
+
+template class RandomVariableLikeNode<float>;
+template class RandomVariableLikeNode<double>;
+template class UniformRandomVariableLikeNode<float>;
+template class UniformRandomVariableLikeNode<double>;
+template class GaussianRandomVariableLikeNode<float>;
+template class GaussianRandomVariableLikeNode<double>;
+template class GumbelRandomVariableLikeNode<float>;
+template class GumbelRandomVariableLikeNode<double>;
+template class BernoulliRandomVariableLikeNode<float>;
+template class BernoulliRandomVariableLikeNode<double>;
 
 }}}

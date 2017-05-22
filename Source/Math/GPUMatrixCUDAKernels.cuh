@@ -1690,39 +1690,18 @@ __global__ void _truncated_normal_transform(
     const ElemType low = (ElemType)0.022750131948179195; // normcdf(-2);
     a[id] = normcdfinv(a[id] * (high - low) + low) * sigma + mean;
 }
+
 template <typename T>
-__global__ void _gumbelFromUniform(
+__global__ inline void _gumbelFromUniform(
     T* a,
     const CUDA_LONG N,
     const T loc,
     const T scale)
 {
-}
-
-template <>
-__global__ void _gumbelFromUniform<float>(
-    float* a,
-    const CUDA_LONG N,
-    const float loc,
-    const float scale)
-{
     CUDA_LONG id = blockDim.x * blockIdx.x + threadIdx.x;
     if (id >= N)
         return;
-    a[id] = loc - scale * logf(-log1pf(- a[id]));
-}
-
-template <>
-__global__ void _gumbelFromUniform<double>(
-    double* a,
-    const CUDA_LONG N,
-    const double loc,
-    const double scale)
-{
-    CUDA_LONG id = blockDim.x * blockIdx.x + threadIdx.x;
-    if (id >= N)
-        return;
-    a[id] = loc - scale * log(-log1p(-a[id]));
+    a[id] = loc - scale * log_(T(1e-40) - log1p_(-a[id])); //in case a[id] == 0 the outer log won't be a log(0)
 }
 
 template <class ElemType>

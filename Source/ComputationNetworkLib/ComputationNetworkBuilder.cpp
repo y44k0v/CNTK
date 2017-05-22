@@ -251,9 +251,9 @@ shared_ptr<ComputationNode<ElemType>> ComputationNetworkBuilder<ElemType>::Creat
 }
 
 template <class ElemType>
-shared_ptr<ComputationNode<ElemType>> ComputationNetworkBuilder<ElemType>::CreateRandomVariableNode(const std::wstring& inputName, int distribution, const TensorShape& sampleLayout, const wstring& dynamicAxisName)
+shared_ptr<ComputationNode<ElemType>> ComputationNetworkBuilder<ElemType>::CreateRandomVariableNode(const std::wstring& inputName, const TensorShape& sampleLayout, const wstring& dynamicAxisName)
 {
-    return net.AddNodeToNetWithElemType(New<RandomVariableNode<ElemType>>(net.GetDeviceId(), inputName, distribution, sampleLayout, dynamicAxisName));
+    return net.AddNodeToNetWithElemType(New<RandomVariableNode<ElemType>>(net.GetDeviceId(), inputName, sampleLayout, dynamicAxisName));
 }
 
 
