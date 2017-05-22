@@ -18,6 +18,10 @@ for t in *_test.py; do
   (( $? == 0 || $? == 5 )) || ((ERRORS++))
 done
 
+python mem_leak_check.py
+(( $? == 0 || $? == 5 )) || ((ERRORS++))
+
 if (( ERRORS == 0 )); then
   echo "__COMPLETED__"
 fi
+
