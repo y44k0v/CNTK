@@ -22,7 +22,7 @@ sys.path.append(example_dir)
 TOLERANCE_ABSOLUTE = 2E-1
 TIMEOUT_SECONDS = 300
 
-def mpiexec_test(device_id, script, mpiexec_params, params, expected_test_error, match_exactly=True, per_minibatch_tolerance=TOLERANCE_ABSOLUTE, error_tolerance=TOLERANCE_ABSOLUTE):
+def mpiexec_test(device_id, script, mpiexec_params, params, expected_test_error, match_exactly=True, per_minibatch_tolerance=TOLERANCE_ABSOLUTE, error_tolerance=TOLERANCE_ABSOLUTE, timeout_seconds=TIMEOUT_SECONDS):
     if cntk_device(device_id).type() != DeviceKind_GPU:
        pytest.skip('test only runs on GPU')
 
@@ -32,7 +32,7 @@ def mpiexec_test(device_id, script, mpiexec_params, params, expected_test_error,
         out = p.communicate()[0]
     else:
         try:
-            out = p.communicate(timeout=TIMEOUT_SECONDS)[0]  # in case we have a hang
+            out = p.communicate(timeout=timeout_seconds)[0]  # in case we have a hang
         except subprocess.TimeoutExpired:
             os.kill(p.pid, signal.CTRL_C_EVENT)
             raise RuntimeError('Timeout in mpiexec, possibly hang')

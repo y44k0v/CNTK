@@ -14,12 +14,12 @@ import cntk.io.transforms as xforms
 
 import cntk as C
 from cntk.logging import *
-from cntk.ops import *
-from cntk.distributed import data_parallel_distributed_learner, Communicator
+from cntk.ops import placeholder, minus, constant, relu
+from cntk.train.distributed import data_parallel_distributed_learner, Communicator
 from cntk.io import ImageDeserializer, MinibatchSource, StreamDef, StreamDefs, FULL_DATA_SWEEP
-from cntk.layers import Placeholder, Convolution2D, Activation, MaxPooling, Dense, Dropout, default_options, Sequential, For
+from cntk.layers import Convolution2D, Activation, MaxPooling, Dense, Dropout, default_options, Sequential, For
 from cntk.initializer import normal
-from cntk.training_session import *
+from cntk.train.training_session import *
 
 # default Paths relative to current python file.
 abs_path   = os.path.dirname(os.path.abspath(__file__))
@@ -43,7 +43,7 @@ def create_image_mb_source(map_file, is_training, total_number_of_samples):
     transforms = []
     if is_training:
         transforms += [
-            xforms.crop(crop_type='randomside', side_ratio=0.4375:0.875, jitter_type='uniratio') # train uses jitter
+            xforms.crop(crop_type='randomside', side_ratio=0.875, jitter_type='uniratio') # train uses jitter
         ]
     else:
         transforms += [
@@ -117,9 +117,9 @@ def create_vgg16():
             ])(input)
 
     # loss and metric
-    ce = cross_entropy_with_softmax(z, label_var)
-    pe = classification_error(z, label_var)
-    pe5 = classification_error(z, label_var, topN=5)
+    ce = C.cross_entropy_with_softmax(z, label_var)
+    pe = C.classification_error(z, label_var)
+    pe5 = C.classification_error(z, label_var, topN=5)
 
     log_number_of_parameters(z) ; print()
 
@@ -136,12 +136,12 @@ def create_vgg16():
 def create_trainer(network, epoch_size, num_quantization_bits, progress_printer):
     # Set learning parameters
     lr_per_mb         = [0.01]*20 + [0.001]*20 + [0.0001]*20 + [0.00001]*10 + [0.000001]
-    lr_schedule       = C.learning_rate_schedule(lr_per_mb, unit=C.learner.UnitType.minibatch, epoch_size=epoch_size)
-    mm_schedule       = C.learner.momentum_schedule(0.9)
+    lr_schedule       = C.learning_rate_schedule(lr_per_mb, unit=C.learners.UnitType.minibatch, epoch_size=epoch_size)
+    mm_schedule       = C.learners.momentum_schedule(0.9)
     l2_reg_weight     = 0.0005 # CNTK L2 regularization is per sample, thus same as Caffe
 
     # Create learner
-    local_learner = C.learner.momentum_sgd(network['output'].parameters, lr_schedule, mm_schedule, unit_gain=False, l2_regularization_weight=l2_reg_weight)
+    local_learner = C.learners.momentum_sgd(network['output'].parameters, lr_schedule, mm_schedule, unit_gain=False, l2_regularization_weight=l2_reg_weight)
     # Since we reuse parameter settings (learning rate, momentum) from Caffe, we set unit_gain to False to ensure consistency
     parameter_learner = data_parallel_distributed_learner(
         local_learner,
@@ -160,16 +160,14 @@ def train_and_test(network, trainer, train_source, test_source, minibatch_size, 
         network['label']: train_source.streams.labels
     }
 
-    mb_size_schedule = C.minibatch_size_schedule(minibatch_size)
-
     # Train all minibatches
     training_session(
-        trainer=trainer, mb_source = train_source,
-        model_inputs_to_streams = input_map,
-        mb_size_schedule = mb_size_schedule,
+        trainer=trainer, mb_source=train_source,
+        model_inputs_to_streams=input_map,
+        mb_size=minibatch_size,
         progress_frequency=epoch_size,
-        checkpoint_config = CheckpointConfig(filename = os.path.join(model_path, model_name), restore=restore),
-        test_config = TestConfig(source=test_source, mb_size=mb_size_schedule)
+        checkpoint_config=CheckpointConfig(filename=os.path.join(model_path, model_name), restore=restore),
+        test_config=TestConfig(source=test_source, mb_size=minibatch_size)
     ).train()
 
 # Train and evaluate the network.
@@ -204,7 +202,6 @@ if __name__=='__main__':
     parser.add_argument('-e', '--epoch_size', help='Epoch size', type=int, required=False, default='1281167')
     parser.add_argument('-q', '--quantized_bits', help='Number of quantized bits used for gradient aggregation', type=int, required=False, default='32')
     parser.add_argument('-r', '--restart', help='Indicating whether to restart from scratch (instead of restart from checkpoint file by default)', action='store_true')
-    parser.add_argument('-device', '--device', type=int, help="Force to run the script on a specified device", required=False, default=None)
 
     args = vars(parser.parse_args())
 
@@ -214,8 +211,9 @@ if __name__=='__main__':
         data_path = args['datadir']
     if args['logdir'] is not None:
         log_dir = args['logdir']
-    if args['device'] is not None:
-        C.device.try_set_default_device(C.device.gpu(args['device']))
+
+    # Currently we just use CPU since the memory usage is very high for a GPU
+    C.device.try_set_default_device(C.device.cpu())
 
     if not os.path.isdir(data_path):
         raise RuntimeError("Directory %s does not exist" % data_path)
@@ -233,4 +231,4 @@ if __name__=='__main__':
                          num_mbs_per_log=200,
                          gen_heartbeat=True)
     # Must call MPI finalize when process exit without exceptions
-    cntk.distributed.Communicator.finalize()
+    Communicator.finalize()
