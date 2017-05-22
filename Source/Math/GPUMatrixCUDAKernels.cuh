@@ -1692,7 +1692,7 @@ __global__ void _truncated_normal_transform(
 }
 
 template <typename T>
-__global__ inline void _gumbelFromUniform(
+__global__ void _gumbelFromUniform(
     T* a,
     const CUDA_LONG N,
     const T loc,
